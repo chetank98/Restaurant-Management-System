@@ -11,7 +11,13 @@ func adminRoutes(r chi.Router) {
 		admin.Post("/subAdmin", handler.RegisterSubAdmin)
 		admin.Get("/subAdmins", handler.GetSubAdmins)
 		admin.Get("/allUsers", handler.GetAllUsers)
-		admin.Get("/allUsers/{id}", handler.GetAdminUsers)
+		admin.Get("/allUsers/{subAdmin}", handler.GetAdminUsers)
+		admin.Get("/allRestaurants", handler.GetAllRestaurants)
+		admin.Get("/allDishes", handler.GetAllDishes)
+		admin.Get("/subAdminRestaurants/{subAdminID}", handler.GetSubAdminRestaurants)
+		admin.Get("/subAdminDishes/{subAdminID}", handler.GetSubAdminDishes)
+		admin.Put("/restaurant", handler.UpdateRestaurant)
+		admin.Put("/dish", handler.UpdateRestaurant)
 	})
 }
 
@@ -22,6 +28,13 @@ func subAdminRoutes(r chi.Router) {
 		subAdmin.Post("/user", handler.RegisterUser)
 		subAdmin.Get("/users", handler.GetUsers)
 		subAdmin.Put("/", handler.UpdateSelfInfo)
+		subAdmin.Post("/restaurant", handler.OpenRestaurant)
+		subAdmin.Post("/restaurantsDish", handler.AddRestaurantDish)
+		subAdmin.Get("/myRestaurants", handler.GetMyRestaurants)
+		subAdmin.Get("/myDishes", handler.GetMyDishes)
+		subAdmin.Get("/restaurantDish/{restaurantId}", handler.GetRestaurantsDish)
+		subAdmin.Put("/myRestaurants", handler.UpdateMyRestaurant)
+		subAdmin.Put("/myDish", handler.UpdateMyRestaurant)
 	})
 }
 
@@ -32,5 +45,8 @@ func userRoutes(r chi.Router) {
 		user.Put("/", handler.UpdateSelfInfo)
 		user.Post("/address", handler.AddAddress)
 		user.Put("/address", handler.UpdateAddress)
+		user.Get("/allRestaurants", handler.GetAllRestaurants)
+		user.Get("/restaurantDish/{restaurantId}", handler.GetRestaurantsDish)
+		user.Get("/restaurantDistance", handler.GetRestaurantsDistance)
 	})
 }

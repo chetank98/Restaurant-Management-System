@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -177,6 +178,21 @@ func CheckValidation(i interface{}) validator.ValidationErrors {
 		return nil
 	}
 	return err.(validator.ValidationErrors)
+}
+
+func CalculateDistance(lat1, lng1, lat2, lng2 float64) (float64, string) {
+	// Convert degrees to radians
+	var lat1R, lng1R, lat2R, lng2R = lat1 * math.Pi / 180, lng1 * math.Pi / 180, lat2 * math.Pi / 180, lng2 * math.Pi / 180
+	// haversine formula for a central angle
+	var a = math.Sin((lat2R-lat1R)/2)*math.Sin((lat2R-lat1R)/2) +
+		math.Cos(lat1R)*math.Cos(lat2R)*
+			math.Sin((lng2R-lng1R)/2)*math.Sin((lng2R-lng1R)/2)
+	const RadiusOfEarth = 6371
+	var distance = math.Round(200*RadiusOfEarth*math.Atan2(math.Sqrt(a), math.Sqrt(1-a))) / 100
+	if distance < 1 {
+		return distance * 1000, "Meter"
+	}
+	return distance, "Kilo Meter"
 }
 
 // TrimAll removes a given rune form given string

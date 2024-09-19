@@ -6,6 +6,7 @@ import (
 	"rms/database"
 	"rms/models"
 	"rms/utils"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -190,6 +191,26 @@ func UpdateUserInfo(userID, newName, newEmail, newPassword string) error {
 	return err
 }
 
+func RemoveMyUser(userID, createdBy string, role models.Role) error {
+	// language=SQL
+	SQL := `UPDATE users_role 
+		SET archived_at = $1
+		WHERE id = $2 AND created_by = $3 AND role_name = $4
+		RETURNING id;`
+	_, err := database.RMS.Exec(SQL, time.Now(), userID, createdBy, role)
+	return err
+}
+
+func RemoveUser(userID string, role models.Role) error {
+	// language=SQL
+	SQL := `UPDATE users_role 
+		SET archived_at = $1
+		WHERE id = $2 AND role_name = $3
+		RETURNING id;`
+	_, err := database.RMS.Exec(SQL, time.Now(), userID, role)
+	return err
+}
+
 func UpdateUserAddress(AddressID, Address, State, City, PinCode string, Lat, Lng float64) error {
 	// language=SQL
 	SQL := `UPDATE user_address
@@ -227,7 +248,7 @@ func GetUsers(createdBy string, role models.Role) ([]models.User, error) {
 				) AS user_addresses
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
-			JOIN user_address ua on u.id = ua.user_id
+			LEFT JOIN user_address ua on u.id = ua.user_id
 			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.created_by=$1 AND ucr.role_name=$2
 			GROUP BY u.id, u.name, u.email, u.password, u.created_at, ucr.role_name`
 	users := make([]models.User, 0)
@@ -282,7 +303,7 @@ func GetAllUsers(role models.Role) ([]models.User, error) {
 				) AS user_addresses
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
-			JOIN user_address ua on u.id = ua.user_id
+			LEFT JOIN user_address ua on u.id = ua.user_id
 			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1
 			GROUP BY u.id, u.name, u.email,u.password, u.created_at, ucr.role_name`
 	users := make([]models.User, 0)

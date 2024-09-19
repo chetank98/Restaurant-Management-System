@@ -9,8 +9,8 @@ import (
 	"rms/utils"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 )
 
 func LoginUser(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +24,6 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusBadRequest, parseErr, "failed to parse request body")
 		return
 	}
-	logrus.Printf(" Body: %s", body)
 
 	userId, userRoleId, userErr := dbHelper.GetUserRoleIDByPassword(body.Email, body.Password, body.Role)
 	if userErr != nil {
@@ -140,7 +139,7 @@ func AddAddress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(body.City) > 20 || len(body.City) <= 2 {
+	if len(body.PinCode) != 6 {
 		utils.RespondError(w, http.StatusBadRequest, nil, "PinCode must 6 digit.")
 		return
 	}
@@ -254,5 +253,50 @@ func UpdateAddress(w http.ResponseWriter, r *http.Request) {
 		Message string `json:"message"`
 	}{
 		Message: "Address Update successfully",
+	})
+}
+
+func GetRestaurantsDish(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "restaurantId")
+	RestaurantsMenu, err := dbHelper.GetRestaurantDish(id)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message         string          `json:"message"`
+		RestaurantsMenu []models.Dishes `json:"restaurantsMenu"`
+	}{
+		Message:         "Get Restaurants successfully.",
+		RestaurantsMenu: RestaurantsMenu,
+	})
+}
+
+func GetRestaurantsDistance(w http.ResponseWriter, r *http.Request) {
+	restaurantId := r.URL.Query().Get("restaurantId")
+	userCtx := middlewares.UserContext(r)
+	addressId := r.URL.Query().Get("addressId")
+
+	Restaurant, err := dbHelper.GetRestaurantByID(restaurantId)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Restaurant")
+		return
+	}
+
+	userAddress, addressErr := utils.GetUserAddressById(addressId, userCtx.UserAddresses)
+	if addressErr != nil {
+		utils.RespondError(w, http.StatusBadRequest, nil, "Address not exist")
+		return
+	}
+
+	Distance, Unit := utils.CalculateDistance(userAddress.Lat, userAddress.Lng, Restaurant.Lat, Restaurant.Lng)
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message      string  `json:"message"`
+		Distance     float64 `json:"restaurantsDistance"`
+		DistanceUnit string  `json:"distanceUnit"`
+	}{
+		Message:      "Get Restaurants successfully.",
+		Distance:     Distance,
+		DistanceUnit: Unit,
 	})
 }

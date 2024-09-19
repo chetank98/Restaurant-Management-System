@@ -8,6 +8,7 @@ import (
 	"rms/middlewares"
 	"rms/models"
 	"rms/utils"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
@@ -178,5 +179,349 @@ func GetAdminUsers(w http.ResponseWriter, r *http.Request) {
 	}{
 		Message: "Get users successfully.",
 		Users:   Users,
+	})
+}
+
+func RemoveSubAdmin(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "userId")
+	adminCtx := middlewares.UserContext(r)
+	err := dbHelper.RemoveMyUser(id, adminCtx.ID, models.RoleSubAdmin)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message string `json:"message"`
+	}{
+		Message: "User remove successfully.",
+	})
+}
+
+func RemoveUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "userId")
+	err := dbHelper.RemoveUser(id, models.RoleSubAdmin)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message string `json:"message"`
+	}{
+		Message: "User remove successfully.",
+	})
+}
+
+// Restaurants
+
+func GetAllRestaurants(w http.ResponseWriter, r *http.Request) {
+	isFilter := r.URL.Query().Get("isFilter")
+	Name := r.URL.Query().Get("name")
+	SortBy := r.URL.Query().Get("sortBy")
+	Range := r.URL.Query().Get("range")
+	if isFilter == "true" {
+		var NumberRange int64
+		if Name == "" {
+			Name = "id"
+		}
+		if SortBy == "" {
+			SortBy = "CreatedAt"
+		}
+		if Range == "" {
+			NumberRange = 10
+		} else {
+			Number, err := strconv.ParseInt(Range, 10, 64)
+			if err != nil {
+				utils.RespondError(w, http.StatusInternalServerError, err, "Range is not a number")
+				return
+			}
+			NumberRange = Number
+		}
+		Restaurants, err := dbHelper.GetFilteredRestaurants(Name, SortBy, NumberRange)
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Restaurants")
+			return
+		}
+		utils.RespondJSON(w, http.StatusCreated, struct {
+			Message     string              `json:"message"`
+			Restaurants []models.Restaurant `json:"restaurants"`
+		}{
+			Message:     "Get Restaurants successfully.",
+			Restaurants: Restaurants,
+		})
+
+	} else {
+		Restaurants, err := dbHelper.GetAllRestaurants()
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Restaurants")
+			return
+		}
+		utils.RespondJSON(w, http.StatusCreated, struct {
+			Message     string              `json:"message"`
+			Restaurants []models.Restaurant `json:"restaurants"`
+		}{
+			Message:     "Get Restaurants successfully.",
+			Restaurants: Restaurants,
+		})
+	}
+}
+
+func GetSubAdminRestaurants(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "subAdminID")
+	Restaurants, err := dbHelper.GetRestaurantsByUserID(id)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message     string              `json:"message"`
+		Restaurants []models.Restaurant `json:"restaurants"`
+	}{
+		Message:     "Get Restaurants successfully.",
+		Restaurants: Restaurants,
+	})
+}
+
+func GetAllDishes(w http.ResponseWriter, r *http.Request) {
+	isFilter := r.URL.Query().Get("isFilter")
+	Name := r.URL.Query().Get("name")
+	SortBy := r.URL.Query().Get("sortBy")
+	Range := r.URL.Query().Get("range")
+	if isFilter == "true" {
+		var NumberRange int64
+		if Name == "" {
+			Name = "id"
+		}
+		if SortBy == "" {
+			SortBy = "CreatedAt"
+		}
+		if Range == "" {
+			NumberRange = 10
+		} else {
+			Number, err := strconv.ParseInt(Range, 10, 64)
+			if err != nil {
+				utils.RespondError(w, http.StatusInternalServerError, err, "Range is not a number")
+				return
+			}
+			NumberRange = Number
+		}
+		Dishes, err := dbHelper.GetFilteredDishes(Name, SortBy, NumberRange)
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+			return
+		}
+		utils.RespondJSON(w, http.StatusCreated, struct {
+			Message string          `json:"message"`
+			Dishes  []models.Dishes `json:"dishes"`
+		}{
+			Message: "Get Dishes successfully.",
+			Dishes:  Dishes,
+		})
+
+	} else {
+		Dishes, err := dbHelper.GetAllDishes()
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+			return
+		}
+		utils.RespondJSON(w, http.StatusCreated, struct {
+			Message string          `json:"message"`
+			Dishes  []models.Dishes `json:"dishes"`
+		}{
+			Message: "Get Dishes successfully.",
+			Dishes:  Dishes,
+		})
+	}
+}
+
+func GetSubAdminDishes(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "subAdminID")
+	Menu, err := dbHelper.GetDishesByUserID(id)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message string          `json:"message"`
+		Menu    []models.Dishes `json:"menu"`
+	}{
+		Message: "Get Dishes successfully.",
+		Menu:    Menu,
+	})
+}
+
+func UpdateRestaurant(w http.ResponseWriter, r *http.Request) {
+	body := struct {
+		ID      string  `json:"id"`
+		Name    string  `json:"name"`
+		Email   string  `json:"email"`
+		Address string  `json:"address"`
+		State   string  `json:"state"`
+		City    string  `json:"city"`
+		PinCode string  `json:"pinCode"`
+		Lat     float64 `json:"lat"`
+		Lng     float64 `json:"lng"`
+	}{}
+
+	if parseErr := utils.ParseBody(r.Body, &body); parseErr != nil {
+		utils.RespondError(w, http.StatusBadRequest, parseErr, "failed to parse request body")
+		return
+	}
+
+	restaurant, restaurantErr := dbHelper.GetRestaurantByID(body.ID)
+	if restaurantErr != nil {
+		utils.RespondError(w, http.StatusBadRequest, nil, "Restaurant not exist")
+		return
+	}
+
+	if body.Name == "" {
+		body.Name = restaurant.Name
+	}
+	if !utils.IsEmailValid(body.Email) {
+		if body.Email != "" {
+			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Email")
+			return
+		}
+		body.Email = restaurant.Email
+	}
+
+	if len(body.Address) > 30 || len(body.Address) <= 2 {
+		if body.Address != "" {
+			utils.RespondError(w, http.StatusBadRequest, nil, "Address must be with in 2 to 30 letter.")
+			return
+		}
+		body.Address = restaurant.Address
+	}
+
+	if len(body.State) > 16 || len(body.State) <= 2 {
+		if body.State != "" {
+			utils.RespondError(w, http.StatusBadRequest, nil, "State must be with in 2 to 16 letter.")
+			return
+		}
+		body.State = restaurant.State
+	}
+
+	if len(body.City) > 20 || len(body.City) <= 2 {
+		if body.City != "" {
+			utils.RespondError(w, http.StatusBadRequest, nil, "City must be with in 2 to 20 letter.")
+			return
+		}
+		body.City = restaurant.City
+	}
+
+	if len(body.PinCode) != 6 {
+		if body.PinCode != "" {
+			utils.RespondError(w, http.StatusBadRequest, nil, "PinCode must 6 digit.")
+			return
+		}
+		body.PinCode = restaurant.PinCode
+	}
+
+	if body.Lat > 90 || body.Lat < -90 {
+		if body.Lat != 0 {
+			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Latitude.")
+			return
+		}
+		body.Lat = restaurant.Lat
+	}
+
+	if body.Lng > 180 || body.Lng < -180 {
+		if body.Lat != 0 {
+			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Longitude.")
+			return
+		}
+		body.Lng = restaurant.Lng
+	}
+
+	err := dbHelper.UpdateRestaurant(body.ID, body.Name, body.Email, body.Address, body.State, body.City, body.PinCode, body.Lat, body.Lng)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "failed update User")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message string `json:"message"`
+	}{
+		Message: "Address Update successfully",
+	})
+}
+
+func CloseRestaurant(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "restaurantId")
+	err := dbHelper.CloseRestaurant(id)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message string `json:"message"`
+	}{
+		Message: "Restaurant Closed successfully.",
+	})
+}
+
+func UpdateDish(w http.ResponseWriter, r *http.Request) {
+	body := struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Quantity    int64  `json:"quantity"`
+		Price       int64  `json:"price"`
+		Discount    int64  `json:"discount"`
+	}{}
+
+	if parseErr := utils.ParseBody(r.Body, &body); parseErr != nil {
+		utils.RespondError(w, http.StatusBadRequest, parseErr, "failed to parse request body")
+		return
+	}
+
+	dish, dishErr := dbHelper.GetDishByID(body.ID)
+	if dishErr != nil {
+		utils.RespondError(w, http.StatusBadRequest, nil, "Dish not exist")
+		return
+	}
+
+	if body.Name == "" {
+		body.Name = dish.Name
+	}
+
+	if body.Description == "" {
+		body.Name = dish.Description
+	}
+
+	if body.Quantity <= 0 {
+		body.Quantity = dish.Quantity
+	}
+
+	if body.Price <= 0 {
+		body.Price = dish.Price
+	}
+
+	if body.Discount > 100 || body.Discount < 0 {
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Discount.")
+		return
+	}
+
+	err := dbHelper.UpdateDish(body.ID, body.Name, body.Description, body.Quantity, body.Price, body.Discount)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "failed update User")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message string `json:"message"`
+	}{
+		Message: "Address Update successfully",
+	})
+}
+
+func RemoveDish(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "dishId")
+	err := dbHelper.RemoveDish(id)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+		return
+	}
+	utils.RespondJSON(w, http.StatusCreated, struct {
+		Message string `json:"message"`
+	}{
+		Message: "Dish Removed successfully.",
 	})
 }

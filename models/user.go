@@ -1,10 +1,6 @@
 package models
 
-import (
-	"encoding/json"
-	"io"
-	"time"
-)
+import "time"
 
 type Role string
 
@@ -37,8 +33,4 @@ type UserAddress struct {
 	Lat       float64   `json:"lat" db:"lat"`
 	Lng       float64   `json:"lng" db:"lng"`
 	CreatedAt time.Time `json:"createdAt" db:"created_at"`
-}
-
-func (adderss UserAddress) init(body io.Reader) {
-	json.NewDecoder(body).Decode(adderss)
 }
