@@ -2,7 +2,6 @@ package dbHelper
 
 import (
 	"database/sql"
-	"encoding/json"
 	"rms/database"
 	"rms/models"
 	"rms/utils"
@@ -28,10 +27,10 @@ func CreateUserRole(db sqlx.Ext, userID, createdBy string, role models.Role) err
 	return err
 }
 
-func CreateUserAddress(db sqlx.Ext, userID, address, state, city, pinCode string, lat, lng float64) error {
+func CreateUserAddress(userID, address, state, city, pinCode string, lat, lng float64) error {
 	// language=SQL
 	SQL := `INSERT INTO user_address(user_id, address, state, city, pin_code, lat, lng) VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := db.Exec(SQL, userID, address, state, city, pinCode, lat, lng)
+	_, err := database.RMS.Exec(SQL, userID, address, state, city, pinCode, lat, lng)
 	return err
 }
 
@@ -64,6 +63,7 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 	user.UserAddresses = address
 	return &user, nil
 }
+
 func GetUserAddress(userID string, userRole models.Role) ([]models.UserAddress, error) {
 	if userRole == models.RoleUser {
 		// language=SQL
@@ -191,11 +191,11 @@ func UpdateUserInfo(userID, newName, newEmail, newPassword string) error {
 	return err
 }
 
-func RemoveMyUser(userID, createdBy string, role models.Role) error {
+func RemoveUserByAdminID(userID, createdBy string, role models.Role) error {
 	// language=SQL
-	SQL := `UPDATE users_role 
+	SQL := `UPDATE user_roles 
 		SET archived_at = $1
-		WHERE id = $2 AND created_by = $3 AND role_name = $4
+		WHERE user_id = $2 AND created_by = $3 AND role_name = $4
 		RETURNING id;`
 	_, err := database.RMS.Exec(SQL, time.Now(), userID, createdBy, role)
 	return err
@@ -203,9 +203,9 @@ func RemoveMyUser(userID, createdBy string, role models.Role) error {
 
 func RemoveUser(userID string, role models.Role) error {
 	// language=SQL
-	SQL := `UPDATE users_role 
+	SQL := `UPDATE user_roles 
 		SET archived_at = $1
-		WHERE id = $2 AND role_name = $3
+		WHERE user_id = $2 AND role_name = $3
 		RETURNING id;`
 	_, err := database.RMS.Exec(SQL, time.Now(), userID, role)
 	return err
@@ -226,7 +226,7 @@ func UpdateUserAddress(AddressID, Address, State, City, PinCode string, Lat, Lng
 	return err
 }
 
-func GetUsers(createdBy string, role models.Role) ([]models.User, error) {
+func GetUsersByAdminID(createdBy string, role models.Role, Filters models.Filters) ([]models.User, error) {
 	// language=SQL
 	SQL := `SELECT 
        			u.id,
@@ -249,39 +249,59 @@ func GetUsers(createdBy string, role models.Role) ([]models.User, error) {
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
 			LEFT JOIN user_address ua on u.id = ua.user_id
-			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.created_by=$1 AND ucr.role_name=$2
-			GROUP BY u.id, u.name, u.email, u.password, u.created_at, ucr.role_name`
-	users := make([]models.User, 0)
-	rows, err := database.RMS.Query(SQL, createdBy, role)
+			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.created_by=$1 AND ucr.role_name=$2 AND
+			 	u.name LIKE '%' || $3 || '%' AND  u.email LIKE '%' || $4 || '%'
+			GROUP BY u.id, u.name, u.email, u.password, u.created_at, ucr.role_name
+			ORDER BY $5
+			LIMIT $6
+			OFFSET $7`
+	rows, err := database.RMS.Query(SQL, createdBy, role, Filters.Name, Filters.Email, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	for rows.Next() {
-		var user models.User
-		var userAddressesJSON string
-		err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt, &user.CurrentRole, &userAddressesJSON)
-		if err != nil {
-			return nil, err
-		}
-
-		user.Password = "******"
-
-		// Parse JSON-encoded user addresses
-		var addresses []models.UserAddress
-		if err := json.Unmarshal([]byte(userAddressesJSON), &addresses); err != nil {
-			return nil, err
-		}
-		user.UserAddresses = addresses
-
-		users = append(users, user)
-	}
-	return users, nil
+	return utils.ImproveUsers(rows)
 }
 
-func GetAllUsers(role models.Role) ([]models.User, error) {
+func GetUserCountByAdminID(createdBy string, role models.Role, Filters models.Filters) (int64, error) {
+	SQL := `SELECT 
+       			COUNT(id)
+			FROM users u
+			JOIN user_roles ucr on u.id = ucr.user_id
+			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.created_by=$1 AND ucr.role_name=$2 AND
+			u.name LIKE '%' || $3 || '%' AND  u.email LIKE '%' || $4 || '%'`
+	var count int64
+	err := database.RMS.Get(&count, SQL, createdBy, role, Filters.Name, Filters.Email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return count, nil
+}
+
+func GetUserCount(role models.Role, Filters models.Filters) (int64, error) {
+	SQL := `SELECT 
+       			COUNT(ucr.id)
+			FROM users u
+			JOIN user_roles ucr on u.id = ucr.user_id
+			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1 AND ucr.created_by::text LIKE '%' || $2 || '%' AND
+			u.name LIKE '%' || $3 || '%' AND  u.email LIKE '%' || $4 || '%'`
+	var count int64
+	err := database.RMS.Get(&count, SQL, role, Filters.CreatedBy, Filters.Name, Filters.Email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return count, nil
+}
+
+func GetUsers(role models.Role, Filters models.Filters) ([]models.User, error) {
 	// language=SQL
 	SQL := `SELECT 
        			u.id,
@@ -304,34 +324,18 @@ func GetAllUsers(role models.Role) ([]models.User, error) {
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
 			LEFT JOIN user_address ua on u.id = ua.user_id
-			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1
-			GROUP BY u.id, u.name, u.email,u.password, u.created_at, ucr.role_name`
-	users := make([]models.User, 0)
-	rows, err := database.RMS.Query(SQL, role)
+			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1 AND ucr.created_by::text LIKE '%' || $2 || '%' AND
+			u.name LIKE '%' || $3 || '%' AND  u.email LIKE '%' || $4 || '%'
+			GROUP BY u.id, u.name, u.email,u.password, u.created_at, ucr.role_name
+			ORDER BY $5
+			LIMIT $6
+			OFFSET $7`
+	rows, err := database.RMS.Query(SQL, role, Filters.CreatedBy, Filters.Name, Filters.Email, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	for rows.Next() {
-		var user models.User
-		var userAddressesJSON string
-		err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt, &user.CurrentRole, &userAddressesJSON)
-		if err != nil {
-			return nil, err
-		}
-
-		user.Password = "******"
-
-		// Parse JSON-encoded user addresses
-		var addresses []models.UserAddress
-		if err := json.Unmarshal([]byte(userAddressesJSON), &addresses); err != nil {
-			return nil, err
-		}
-		user.UserAddresses = addresses
-
-		users = append(users, user)
-	}
-	return users, nil
+	return utils.ImproveUsers(rows)
 }

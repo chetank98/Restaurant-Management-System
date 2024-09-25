@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"rms/handler"
 	"rms/middlewares"
-	"rms/models"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -30,22 +29,24 @@ func SetupRoutes() *Server {
 		v1.Use(middlewares.CommonMiddlewares()...)
 		v1.Route("/", func(public chi.Router) {
 			public.Post("/login", handler.LoginUser)
-		})
-		v1.Route("/user", func(user chi.Router) {
-			user.Use(middlewares.AuthMiddleware)
-			user.Use(middlewares.ShouldHaveRole(models.RoleUser))
-			user.Group(userRoutes)
-		})
-		v1.Route("/sub-admin", func(subAdmin chi.Router) {
-			subAdmin.Use(middlewares.AuthMiddleware)
-			subAdmin.Use(middlewares.ShouldHaveRole(models.RoleSubAdmin))
-			subAdmin.Group(subAdminRoutes)
-		})
-		v1.Route("/admin", func(admin chi.Router) {
-			admin.Use(middlewares.AuthMiddleware)
-			admin.Use(middlewares.ShouldHaveRole(models.RoleAdmin))
-			admin.Group(adminRoutes)
-			admin.Group(subAdminRoutes)
+			public.Route("/", func(authRouts chi.Router) {
+				authRouts.Use(middlewares.AuthMiddleware)
+				authRouts.Get("/", handler.GetInfo)
+				authRouts.Put("/", handler.UpdateSelfInfo)
+				authRouts.Delete("/logout", handler.Logout)
+				authRouts.Get("/restaurants", handler.GetRestaurants)
+				authRouts.Get("/restaurant/{restaurantId}/dishes", handler.GetRestaurantsDishes)
+				authRouts.Route("/user", func(user chi.Router) {
+					user.Group(userRoutes)
+				})
+				authRouts.Route("/sub-admin", func(subAdmin chi.Router) {
+					subAdmin.Group(subAdminRoutes)
+				})
+				authRouts.Route("/admin", func(admin chi.Router) {
+					admin.Group(adminRoutes)
+					admin.Group(subAdminRoutes)
+				})
+			})
 		})
 	})
 	return &Server{

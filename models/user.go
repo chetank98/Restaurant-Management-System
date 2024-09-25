@@ -14,6 +14,21 @@ func (r Role) IsValid() bool {
 	return r == RoleAdmin || r == RoleSubAdmin || r == RoleUser
 }
 
+type SortedBy string
+
+const (
+	ID        SortedBy = "id"
+	Name      SortedBy = "name"
+	Email     SortedBy = "email"
+	CreatedBy SortedBy = "created_by"
+)
+
+func (s SortedBy) IsValid() bool {
+	return s == ID || s == Name || s == Email || s == CreatedBy
+}
+
+// User
+
 type User struct {
 	ID            string        `json:"id" db:"id"`
 	Name          string        `json:"name" db:"name"`
@@ -24,6 +39,50 @@ type User struct {
 	UserAddresses []UserAddress `json:"Addresses" db:"user_addresses"`
 }
 
+type Filters struct {
+	PageNumber int64
+	PageSize   int64
+	Name       string
+	Email      string
+	CreatedBy  string
+	SortBy     SortedBy
+}
+
+type RegisterUserBody struct {
+	Name     string `json:"name" db:"name"`
+	Email    string `json:"email" db:"email"`
+	Password string `json:"password" db:"password"`
+}
+
+type GetUsers struct {
+	Message    string `json:"message"`
+	Users      []User `json:"users"`
+	TotalCount int64  `json:"totalCount"`
+	PageNumber int64  `json:"pageNumber"`
+	PageSize   int64  `json:"pageSize"`
+}
+
+type GetUser struct {
+	Message string `json:"message"`
+	User    User   `json:"info"`
+}
+
+type Login struct {
+	Token   string `json:"token"`
+	Type    string `json:"tokenType"`
+	Message string `json:"message"`
+}
+
+type GetSubAdmins struct {
+	Message    string `json:"message"`
+	SubAdmins  []User `json:"subAdmins"`
+	TotalCount int64  `json:"totalCount"`
+	PageNumber int64  `json:"pageNumber"`
+	PageSize   int64  `json:"pageSize"`
+}
+
+// Address
+
 type UserAddress struct {
 	ID        string    `json:"id" db:"id"`
 	Address   string    `json:"address" db:"address"`
@@ -33,4 +92,19 @@ type UserAddress struct {
 	Lat       float64   `json:"lat" db:"lat"`
 	Lng       float64   `json:"lng" db:"lng"`
 	CreatedAt time.Time `json:"createdAt" db:"created_at"`
+}
+
+type AddUserAddressBody struct {
+	Address string  `json:"address" db:"address"`
+	State   string  `json:"state" db:"state"`
+	City    string  `json:"city" db:"city"`
+	PinCode string  `json:"pinCode" db:"pin_code"`
+	Lat     float64 `json:"lat" db:"lat"`
+	Lng     float64 `json:"lng" db:"lng"`
+}
+
+// Message
+
+type Message struct {
+	Message string `json:"message"`
 }
