@@ -15,93 +15,110 @@ import (
 )
 
 func RegisterSubAdmin(w http.ResponseWriter, r *http.Request) {
-	body := struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}{}
+	var body models.RegisterUserBody
 	adminCtx := middlewares.UserContext(r)
 	if parseErr := utils.ParseBody(r.Body, &body); parseErr != nil {
-		utils.RespondError(w, http.StatusBadRequest, parseErr, "failed to parse request body")
+		logrus.Printf("Failed to parse request body: %s", parseErr)
+		utils.RespondError(w, http.StatusBadRequest, parseErr, "Failed to parse request body")
 		return
 	}
 	if len(body.Password) < 6 {
+		logrus.Printf("password must be 6 chars long.")
 		utils.RespondError(w, http.StatusBadRequest, nil, "password must be 6 chars long")
 		return
 	}
 
 	if !utils.IsEmailValid(body.Email) {
+		logrus.Printf("Invalid Email.")
 		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Email.")
 		return
 	}
 
 	exists, existsErr := dbHelper.IsUserRoleExists(body.Email, models.RoleSubAdmin)
 	if existsErr != nil {
-		utils.RespondError(w, http.StatusInternalServerError, existsErr, "failed to check user role existence")
+		logrus.Printf("Failed to check user role existence: %s", existsErr)
+		utils.RespondError(w, http.StatusInternalServerError, existsErr, "Failed to check Sub-Admin existence")
 		return
 	}
 	if exists {
-		utils.RespondError(w, http.StatusBadRequest, nil, "user already exists")
+		logrus.Printf("Sub-Admin already exists")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Sub-Admin already exists")
 		return
 	}
 	hashedPassword, hasErr := utils.HashPassword(body.Password)
 	if hasErr != nil {
-		utils.RespondError(w, http.StatusInternalServerError, hasErr, "failed to secure password")
+		logrus.Printf("Failed to secure password: %s", hasErr)
+		utils.RespondError(w, http.StatusInternalServerError, hasErr, "Failed to secure password")
 		return
 	}
 	txErr := database.Tx(func(tx *sqlx.Tx) error {
 		userID, existsErr := dbHelper.IsUserExists(body.Email)
 		if existsErr != nil {
-			utils.RespondError(w, http.StatusInternalServerError, existsErr, "failed to check user existence")
+			logrus.Printf("Failed to check user existence: %s", existsErr)
+			utils.RespondError(w, http.StatusInternalServerError, existsErr, "Failed to check user existence")
 			return existsErr
 		}
 		if len(userID) > 0 {
 			roleErr := dbHelper.CreateUserRole(tx, userID, adminCtx.ID, models.RoleSubAdmin)
 			if roleErr != nil {
+				logrus.Printf("Failed to create User Role: %s", roleErr)
 				return roleErr
 			}
 		} else {
 			userID, saveErr := dbHelper.CreateUser(tx, body.Name, body.Email, hashedPassword)
 			if saveErr != nil {
+				logrus.Printf("Failed to Save Sub-Admin: %s", saveErr)
 				return saveErr
 			}
 			roleErr := dbHelper.CreateUserRole(tx, userID, adminCtx.ID, models.RoleSubAdmin)
 			if roleErr != nil {
+				logrus.Printf("Failed to create User Role: %s", roleErr)
 				return roleErr
 			}
 		}
 		return nil
 	})
 	if txErr != nil {
-		utils.RespondError(w, http.StatusInternalServerError, txErr, "failed to create user")
+		logrus.Printf("Failed to create SubAdmin: %s", txErr)
+		utils.RespondError(w, http.StatusInternalServerError, txErr, "Failed to create user")
 		return
 	}
-	utils.RespondJSON(w, http.StatusCreated, struct {
-		Message string `json:"message"`
-	}{
+	logrus.Printf("SubAdmin Created successfully.")
+	utils.RespondJSON(w, http.StatusCreated, models.Message{
 		Message: "SubAdmin Created successfully",
 	})
 }
 
 func GetSubAdmins(w http.ResponseWriter, r *http.Request) {
-	adminCtx := middlewares.UserContext(r)
-	subAdmins, err := dbHelper.GetUsers(adminCtx.ID, models.RoleSubAdmin)
-	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+	Filters := utils.GetFilters(r)
+	if Filters.Email != "" && !utils.IsEmailValid(Filters.Email) {
+		logrus.Printf("Invalid Filter Email.")
+		utils.RespondError(w, http.StatusInternalServerError, nil, "Invalid Filter Email.")
 		return
 	}
-	utils.RespondJSON(w, http.StatusCreated, struct {
-		Message   string        `json:"message"`
-		SubAdmins []models.User `json:"subAdmins"`
-	}{
-		Message:   "Get subAdmin successfully.",
-		SubAdmins: subAdmins,
+	UserCount, countErr := dbHelper.GetUserCount(models.RoleSubAdmin, Filters)
+	if countErr != nil {
+		logrus.Printf("Unable to get Users: %s", countErr)
+		utils.RespondError(w, http.StatusInternalServerError, countErr, "Unable to get Users")
+		return
+	}
+	subAdmins, err := dbHelper.GetUsers(models.RoleSubAdmin, Filters)
+	if err != nil {
+		logrus.Printf("Unable to get Sub-Admin: %s", err)
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Sub-Admin")
+		return
+	}
+	logrus.Printf("Get subAdmin successfully.")
+	utils.RespondJSON(w, http.StatusCreated, models.GetSubAdmins{
+		Message:    "Get subAdmin successfully.",
+		SubAdmins:  subAdmins,
+		TotalCount: UserCount,
+		PageSize:   Filters.PageSize,
+		PageNumber: Filters.PageNumber,
 	})
 }
 
 func RegisterAdmin() {
-	logrus.Printf("Creating Admin")
-
 	exists, existsErr := dbHelper.IsUserRoleExists(os.Getenv("ADMIN_EMAIL"), models.RoleAdmin)
 	if existsErr != nil {
 		logrus.Printf("User Exist: %s", existsErr)
@@ -147,36 +164,17 @@ func RegisterAdmin() {
 	}
 }
 
-func GetAllUsers(w http.ResponseWriter, r *http.Request) {
-	Users, err := dbHelper.GetAllUsers(models.RoleUser)
+func RemoveSubAdmin(w http.ResponseWriter, r *http.Request) {
+	subAdminId := chi.URLParam(r, "subAdminId")
+	adminCtx := middlewares.UserContext(r)
+	err := dbHelper.RemoveUserByAdminID(subAdminId, adminCtx.ID, models.RoleSubAdmin)
 	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
+		logrus.Printf("Unable to get Sub-Admin: %s", err)
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Sub-Admin")
 		return
 	}
-	utils.RespondJSON(w, http.StatusCreated, struct {
-		Message string        `json:"message"`
-		Users   []models.User `json:"users"`
-	}{
-		Message: "Get users successfully.",
-		Users:   Users,
-	})
-}
-
-func GetAdminUsers(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "subAdmin")
-	if id == "" {
-		utils.RespondError(w, http.StatusInternalServerError, nil, "Invalid Admin")
-	}
-	Users, err := dbHelper.GetUsers(id, models.RoleUser)
-	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Users")
-		return
-	}
-	utils.RespondJSON(w, http.StatusCreated, struct {
-		Message string        `json:"message"`
-		Users   []models.User `json:"users"`
-	}{
-		Message: "Get users successfully.",
-		Users:   Users,
+	logrus.Printf("Sub-Admin remove successfully.")
+	utils.RespondJSON(w, http.StatusCreated, models.Message{
+		Message: "Sub-Admin remove successfully.",
 	})
 }

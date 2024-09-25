@@ -9,7 +9,7 @@ import (
 	"rms/utils"
 	"strings"
 
-	"github.com/jmoiron/sqlx"
+	"github.com/go-chi/chi/v5"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,61 +21,68 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	}{}
 
 	if parseErr := utils.ParseBody(r.Body, &body); parseErr != nil {
-		utils.RespondError(w, http.StatusBadRequest, parseErr, "failed to parse request body")
+		logrus.Printf("Failed to parse request body: %s", parseErr)
+		utils.RespondError(w, http.StatusBadRequest, parseErr, "Failed to parse request body")
 		return
 	}
-	logrus.Printf(" Body: %s", body)
 
 	userId, userRoleId, userErr := dbHelper.GetUserRoleIDByPassword(body.Email, body.Password, body.Role)
 	if userErr != nil {
-		utils.RespondError(w, http.StatusInternalServerError, userErr, "failed to find user")
+		logrus.Printf("Failed to find user: %s", userErr)
+		utils.RespondError(w, http.StatusInternalServerError, userErr, "Failed to find user")
 		return
 	}
 	// create user session
 	sessionToken, jwtError := utils.JwtToken(userId, userRoleId)
 	if jwtError != nil {
+		logrus.Printf(jwtError.Error())
 		utils.RespondError(w, http.StatusInternalServerError, jwtError, jwtError.Error())
 		return
 	}
 	sessionErr := dbHelper.CreateUserSession(database.RMS, userId, userRoleId, sessionToken)
 	if sessionErr != nil {
-		utils.RespondError(w, http.StatusInternalServerError, sessionErr, "failed to create user session")
+		logrus.Printf("Failed to create user session: %s", sessionErr)
+		utils.RespondError(w, http.StatusInternalServerError, sessionErr, "Failed to create user session")
 		return
 	}
-	utils.RespondJSON(w, http.StatusCreated, struct {
-		Token string `json:"token"`
-		Type  string `json:"tokenType"`
-	}{
-		Token: sessionToken,
-		Type:  "Bearer",
+	logrus.Printf("Login Successfully.")
+	utils.RespondJSON(w, http.StatusCreated, models.Login{
+		Token:   sessionToken,
+		Type:    "Bearer",
+		Message: "Login Successfully.",
 	})
 }
 
 func GetInfo(w http.ResponseWriter, r *http.Request) {
 	userCtx := middlewares.UserContext(r)
-	utils.RespondJSON(w, http.StatusOK, userCtx)
+	logrus.Printf("Get information Successfully.")
+	utils.RespondJSON(w, http.StatusOK, models.GetUser{
+		Message: "Get information Successfully.",
+		User:    *userCtx,
+	})
 }
 
 func Logout(w http.ResponseWriter, r *http.Request) {
 	token := strings.Split(r.Header.Get("authorization"), " ")[1]
 	err := dbHelper.DeleteSessionToken(token)
 	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err, "failed to logout user")
+		logrus.Printf("Failed to logout user: %s", err)
+		utils.RespondError(w, http.StatusInternalServerError, err, "Failed to logout user")
 		return
 	}
-	w.WriteHeader(http.StatusAccepted)
+	logrus.Printf("Logout Successfully.")
+	utils.RespondJSON(w, http.StatusAccepted, models.Message{
+		Message: "Logout Successfully.",
+	})
 }
 
 func UpdateSelfInfo(w http.ResponseWriter, r *http.Request) {
-	body := struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}{}
+	var body models.RegisterUserBody
 
 	adminCtx := middlewares.UserContext(r)
 	if parseErr := utils.ParseBody(r.Body, &body); parseErr != nil {
-		utils.RespondError(w, http.StatusBadRequest, parseErr, "failed to parse request body")
+		logrus.Printf("Failed to parse request body: %s", parseErr)
+		utils.RespondError(w, http.StatusBadRequest, parseErr, "Failed to parse request body")
 		return
 	}
 	if body.Name == "" {
@@ -83,7 +90,8 @@ func UpdateSelfInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	if !utils.IsEmailValid(body.Email) {
 		if body.Email != "" {
-			utils.RespondError(w, http.StatusBadRequest, nil, "fInvalid Email")
+			logrus.Printf("Invalid Email.")
+			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Email.")
 			return
 		}
 		body.Email = adminCtx.Email
@@ -93,112 +101,101 @@ func UpdateSelfInfo(w http.ResponseWriter, r *http.Request) {
 	} else {
 		hashedPassword, hasErr := utils.HashPassword(body.Password)
 		if hasErr != nil {
-			utils.RespondError(w, http.StatusInternalServerError, hasErr, "failed to secure password")
+			logrus.Printf("Failed to secure password: %s", hasErr)
+			utils.RespondError(w, http.StatusInternalServerError, hasErr, "Failed to secure password")
 			return
 		}
 		body.Password = hashedPassword
 	}
 	err := dbHelper.UpdateUserInfo(adminCtx.ID, body.Name, body.Email, body.Password)
 	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err, "failed update User")
+		logrus.Printf("Failed update User: %s", err)
+		utils.RespondError(w, http.StatusInternalServerError, err, "Failed update User")
 		return
 	}
-	utils.RespondJSON(w, http.StatusCreated, struct {
-		Message string `json:"message"`
-	}{
-		Message: "user Update successfully",
+	logrus.Printf("User update successfully")
+	utils.RespondJSON(w, http.StatusCreated, models.Message{
+		Message: "User update successfully",
 	})
 }
 
 func AddAddress(w http.ResponseWriter, r *http.Request) {
-	body := struct {
-		Address string  `json:"address"`
-		State   string  `json:"state"`
-		City    string  `json:"city"`
-		PinCode string  `json:"pinCode"`
-		Lat     float64 `json:"lat"`
-		Lng     float64 `json:"lng"`
-	}{}
+	var body models.AddUserAddressBody
 	userCtx := middlewares.UserContext(r)
 	if parseErr := utils.ParseBody(r.Body, &body); parseErr != nil {
-		utils.RespondError(w, http.StatusBadRequest, parseErr, "failed to parse request body")
+		logrus.Printf("Failed to parse request body: %s", parseErr)
+		utils.RespondError(w, http.StatusBadRequest, parseErr, "Failed to parse request body")
 		return
 	}
 
 	if len(body.Address) > 30 || len(body.Address) <= 2 {
+		logrus.Printf("Address must be with in 2 to 30 letter.")
 		utils.RespondError(w, http.StatusBadRequest, nil, "Address must be with in 2 to 30 letter.")
 		return
 	}
 
 	if len(body.State) > 16 || len(body.State) <= 2 {
+		logrus.Printf("State must be with in 2 to 16 letter.")
 		utils.RespondError(w, http.StatusBadRequest, nil, "State must be with in 2 to 16 letter.")
 		return
 	}
 
 	if len(body.City) > 20 || len(body.City) <= 2 {
+		logrus.Printf("City must be with in 2 to 20 letter.")
 		utils.RespondError(w, http.StatusBadRequest, nil, "City must be with in 2 to 20 letter.")
 		return
 	}
 
-	if len(body.City) > 20 || len(body.City) <= 2 {
+	if len(body.PinCode) != 6 {
+		logrus.Printf("PinCode must 6 digit.")
 		utils.RespondError(w, http.StatusBadRequest, nil, "PinCode must 6 digit.")
 		return
 	}
 
 	if body.Lat > 90 || body.Lat < -90 {
+		logrus.Printf("Invalid Latitude.")
 		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Latitude.")
 		return
 	}
 
 	if body.Lng > 180 || body.Lng < -180 {
+		logrus.Printf("Invalid Longitude.")
 		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Longitude.")
 		return
 	}
-
-	txErr := database.Tx(func(tx *sqlx.Tx) error {
-		addressErr := dbHelper.CreateUserAddress(tx, userCtx.ID, body.Address, body.State, body.City, body.PinCode, body.Lat, body.Lng)
-		if addressErr != nil {
-			utils.RespondError(w, http.StatusBadRequest, addressErr, "Invalid Address.")
-			return addressErr
-		}
-		return nil
-	})
-	if txErr != nil {
-		utils.RespondError(w, http.StatusInternalServerError, txErr, "failed to create user")
+	addressErr := dbHelper.CreateUserAddress(userCtx.ID, body.Address, body.State, body.City, body.PinCode, body.Lat, body.Lng)
+	if addressErr != nil {
+		logrus.Printf("Failed to create Address: %s", addressErr)
+		utils.RespondError(w, http.StatusBadRequest, addressErr, "Failed to create Address")
 		return
 	}
-	utils.RespondJSON(w, http.StatusCreated, struct {
-		Message string `json:"message"`
-	}{
-		Message: "Address Created successfully",
+	logrus.Printf("Address Created successfully")
+	utils.RespondJSON(w, http.StatusCreated, models.Message{
+		Message: "Address Created successfully.",
 	})
 }
 
 func UpdateAddress(w http.ResponseWriter, r *http.Request) {
-	body := struct {
-		ID      string  `json:"addressId"`
-		Address string  `json:"address"`
-		State   string  `json:"state"`
-		City    string  `json:"city"`
-		PinCode string  `json:"pinCode"`
-		Lat     float64 `json:"lat"`
-		Lng     float64 `json:"lng"`
-	}{}
+	addressId := chi.URLParam(r, "addressId")
+	var body models.AddUserAddressBody
 
 	userCtx := middlewares.UserContext(r)
 	if parseErr := utils.ParseBody(r.Body, &body); parseErr != nil {
-		utils.RespondError(w, http.StatusBadRequest, parseErr, "failed to parse request body")
+		logrus.Printf("Failed to parse request body: %s", parseErr)
+		utils.RespondError(w, http.StatusBadRequest, parseErr, "Failed to parse request body")
 		return
 	}
 
-	userAddress, addressErr := utils.GetUserAddressById(body.ID, userCtx.UserAddresses)
+	userAddress, addressErr := utils.GetUserAddressById(addressId, userCtx.UserAddresses)
 	if addressErr != nil {
+		logrus.Printf("Address not exist: %s", addressErr)
 		utils.RespondError(w, http.StatusBadRequest, nil, "Address not exist")
 		return
 	}
 
 	if len(body.Address) > 30 || len(body.Address) <= 2 {
 		if body.Address != "" {
+			logrus.Printf("Address must be with in 2 to 30 letter.")
 			utils.RespondError(w, http.StatusBadRequest, nil, "Address must be with in 2 to 30 letter.")
 			return
 		}
@@ -207,6 +204,7 @@ func UpdateAddress(w http.ResponseWriter, r *http.Request) {
 
 	if len(body.State) > 16 || len(body.State) <= 2 {
 		if body.State != "" {
+			logrus.Printf("State must be with in 2 to 16 letter.")
 			utils.RespondError(w, http.StatusBadRequest, nil, "State must be with in 2 to 16 letter.")
 			return
 		}
@@ -215,6 +213,7 @@ func UpdateAddress(w http.ResponseWriter, r *http.Request) {
 
 	if len(body.City) > 20 || len(body.City) <= 2 {
 		if body.City != "" {
+			logrus.Printf("City must be with in 2 to 20 letter.")
 			utils.RespondError(w, http.StatusBadRequest, nil, "City must be with in 2 to 20 letter.")
 			return
 		}
@@ -223,6 +222,7 @@ func UpdateAddress(w http.ResponseWriter, r *http.Request) {
 
 	if len(body.PinCode) != 6 {
 		if body.PinCode != "" {
+			logrus.Printf("PinCode must 6 digit.")
 			utils.RespondError(w, http.StatusBadRequest, nil, "PinCode must 6 digit.")
 			return
 		}
@@ -231,6 +231,7 @@ func UpdateAddress(w http.ResponseWriter, r *http.Request) {
 
 	if body.Lat > 90 || body.Lat < -90 {
 		if body.Lat != 0 {
+			logrus.Printf("Invalid Latitude.")
 			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Latitude.")
 			return
 		}
@@ -239,20 +240,51 @@ func UpdateAddress(w http.ResponseWriter, r *http.Request) {
 
 	if body.Lng > 180 || body.Lng < -180 {
 		if body.Lat != 0 {
+			logrus.Printf("Invalid Longitude.")
 			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Longitude.")
 			return
 		}
 		body.Lng = userAddress.Lng
 	}
 
-	err := dbHelper.UpdateUserAddress(body.ID, body.Address, body.State, body.City, body.PinCode, body.Lat, body.Lng)
+	err := dbHelper.UpdateUserAddress(addressId, body.Address, body.State, body.City, body.PinCode, body.Lat, body.Lng)
 	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err, "failed update User")
+		logrus.Printf("Failed to update Address: %s", addressErr)
+		utils.RespondError(w, http.StatusInternalServerError, err, "Failed to update Address:")
 		return
 	}
-	utils.RespondJSON(w, http.StatusCreated, struct {
-		Message string `json:"message"`
-	}{
+	logrus.Printf("Address Created successfully")
+	utils.RespondJSON(w, http.StatusCreated, models.Message{
 		Message: "Address Update successfully",
+	})
+}
+
+// Restaurant
+
+func GetRestaurantDistance(w http.ResponseWriter, r *http.Request) {
+	restaurantId := r.URL.Query().Get("restaurantId")
+	userCtx := middlewares.UserContext(r)
+	addressId := r.URL.Query().Get("addressId")
+
+	Restaurant, err := dbHelper.GetRestaurantByID(restaurantId)
+	if err != nil {
+		logrus.Printf("Unable to get Restaurant: %s", err)
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Restaurant")
+		return
+	}
+
+	userAddress, addressErr := utils.GetUserAddressById(addressId, userCtx.UserAddresses)
+	if addressErr != nil {
+		logrus.Printf("Address not exist: %s", addressErr)
+		utils.RespondError(w, http.StatusBadRequest, nil, "Address not exist")
+		return
+	}
+
+	Distance, Unit := utils.CalculateDistance(userAddress.Lat, userAddress.Lng, Restaurant.Lat, Restaurant.Lng)
+	logrus.Printf("Restaurant Distance Calculated in %s successfully.", Unit)
+	utils.RespondJSON(w, http.StatusCreated, models.RestaurantDistance{
+		Message:      "Restaurant Distance Calculated successfully.",
+		Distance:     Distance,
+		DistanceUnit: Unit,
 	})
 }
