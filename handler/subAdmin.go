@@ -144,6 +144,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 
 // todo :- remove user details also
 func RemoveUser(w http.ResponseWriter, r *http.Request) {
+	//todo :- remove user details
 	id := chi.URLParam(r, "userId")
 	adminCtx := middlewares.UserContext(r)
 	if adminCtx.CurrentRole == models.RoleAdmin {
