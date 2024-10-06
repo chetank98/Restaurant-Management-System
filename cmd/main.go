@@ -19,6 +19,7 @@ func main() {
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	// create server instance
+	//TODO :- please use database credentials on env file or set up in go env and access it by using os.getEnv() function
 	srv := server.SetupRoutes()
 	if err := database.ConnectAndMigrate(
 		"localhost",

@@ -34,6 +34,7 @@ func CreateUserAddress(userID, address, state, city, pinCode string, lat, lng fl
 	return err
 }
 
+// todo address will be fetched in this single query not any other db call
 func GetUserBySession(sessionToken string) (*models.User, error) {
 	// language=SQL
 	SQL := `SELECT 
@@ -49,6 +50,7 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 	var user models.User
 	err := database.RMS.Get(&user, SQL, sessionToken)
 	if err != nil {
+		//todo :- I think this condition is unnecessary because you will be return same error mag in both case
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -101,6 +103,7 @@ func GetUserRoleIDByPassword(email, password string, role models.Role) (string, 
 	var passwordHash string
 	err := database.RMS.QueryRow(SQL, email, role).Scan(&userID, &userRoleId, &passwordHash)
 	if err != nil {
+		//TODO:- remove if condition
 		if err == sql.ErrNoRows {
 			return "", "", err
 		}
