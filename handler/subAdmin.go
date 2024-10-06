@@ -291,6 +291,7 @@ func GetRestaurants(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	adminCtx := middlewares.UserContext(r)
+	//TODO use errgroup when mutiple db calls for less time consuming
 	if adminCtx.CurrentRole == models.RoleAdmin || adminCtx.CurrentRole == models.RoleUser {
 		RestaurantsCount, countErr := dbHelper.GetRestaurantsCount(Filters)
 		if countErr != nil {
@@ -304,6 +305,7 @@ func GetRestaurants(w http.ResponseWriter, r *http.Request) {
 			utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Restaurants")
 			return
 		}
+		//TODO  write this  message below else one time
 		logrus.Printf("Get Restaurants successfully.")
 		utils.RespondJSON(w, http.StatusCreated, models.GetRestaurants{
 			Message:     "Get Restaurants successfully.",
