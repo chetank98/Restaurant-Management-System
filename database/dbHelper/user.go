@@ -125,6 +125,7 @@ func DeleteSessionToken(token string) error {
 
 func IsUserRoleExists(email string, role models.Role) (bool, error) {
 	// language=SQL
+	//todo alternate use count(*) > 0
 	SQL := `SELECT
 				ur.id
        		FROM
@@ -265,6 +266,7 @@ func GetUsersByAdminID(createdBy string, role models.Role, Filters models.Filter
 		}
 		return nil, err
 	}
+	//todo use select (database.select)
 	return utils.ImproveUsers(rows)
 }
 
@@ -306,6 +308,7 @@ func GetUserCount(role models.Role, Filters models.Filters) (int64, error) {
 
 func GetUsers(role models.Role, Filters models.Filters) ([]models.User, error) {
 	// language=SQL
+	//todo avoid using json agg as much as possible because it is heavy
 	SQL := `SELECT 
        			u.id,
        			u.name,

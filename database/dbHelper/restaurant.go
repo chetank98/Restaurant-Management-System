@@ -87,6 +87,7 @@ func UpdateRestaurant(restaurantID, name, email, Address, State, City, PinCode s
 }
 
 func CloseMyRestaurant(restaurantID, createdBy string) error {
+	//todo := dont return id
 	// language=SQL
 	SQL := `UPDATE restaurants 
 		SET archived_at = $1

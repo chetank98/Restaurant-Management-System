@@ -26,7 +26,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusBadRequest, parseErr, "Failed to parse request body")
 		return
 	}
-
+	//ToDo please check password here not on repo level when user enter wrong password then it gives status 500 but it will gives 400
 	userId, userRoleId, userErr := dbHelper.GetUserRoleIDByPassword(body.Email, body.Password, body.Role)
 	if userErr != nil {
 		logrus.Printf("Failed to find user: %s", userErr)
@@ -169,7 +169,7 @@ func AddAddress(w http.ResponseWriter, r *http.Request) {
 	addressErr := dbHelper.CreateUserAddress(userCtx.ID, body.Address, body.State, body.City, body.PinCode, body.Lat, body.Lng)
 	if addressErr != nil {
 		logrus.Printf("Failed to create Address: %s", addressErr)
-		utils.RespondError(w, http.StatusBadRequest, addressErr, "Failed to create Address")
+		utils.RespondError(w, http.StatusInternalServerError, addressErr, "Failed to create Address")
 		return
 	}
 	logrus.Printf("Address Created successfully")

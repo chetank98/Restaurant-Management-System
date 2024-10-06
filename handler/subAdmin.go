@@ -51,6 +51,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	txErr := database.Tx(func(tx *sqlx.Tx) error {
+		//todo  use this db call outside transaction
 		userID, existsErr := dbHelper.IsUserExists(body.Email)
 		if existsErr != nil {
 			logrus.Printf("Failed to parse request body: %s", existsErr)
@@ -141,6 +142,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// todo :- remove user details also
 func RemoveUser(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "userId")
 	adminCtx := middlewares.UserContext(r)
