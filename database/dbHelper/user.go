@@ -34,6 +34,7 @@ func CreateUserAddress(userID, address, state, city, pinCode string, lat, lng fl
 	return err
 }
 
+// todo address will be fetched in this single query not any other db call
 func GetUserBySession(sessionToken string) (*models.User, error) {
 	// language=SQL
 	SQL := `SELECT 
@@ -49,6 +50,7 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 	var user models.User
 	err := database.RMS.Get(&user, SQL, sessionToken)
 	if err != nil {
+		//todo :- I think this condition is unnecessary because you will be return same error mag in both case
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -101,6 +103,7 @@ func GetUserRoleIDByPassword(email, password string, role models.Role) (string, 
 	var passwordHash string
 	err := database.RMS.QueryRow(SQL, email, role).Scan(&userID, &userRoleId, &passwordHash)
 	if err != nil {
+		//TODO:- remove if condition
 		if err == sql.ErrNoRows {
 			return "", "", err
 		}
@@ -122,6 +125,7 @@ func DeleteSessionToken(token string) error {
 
 func IsUserRoleExists(email string, role models.Role) (bool, error) {
 	// language=SQL
+	//todo alternate use count(*) > 0
 	SQL := `SELECT
 				ur.id
        		FROM
@@ -262,6 +266,7 @@ func GetUsersByAdminID(createdBy string, role models.Role, Filters models.Filter
 		}
 		return nil, err
 	}
+	//todo use select (database.select)
 	return utils.ImproveUsers(rows)
 }
 
@@ -303,6 +308,7 @@ func GetUserCount(role models.Role, Filters models.Filters) (int64, error) {
 
 func GetUsers(role models.Role, Filters models.Filters) ([]models.User, error) {
 	// language=SQL
+	//todo avoid using json agg as much as possible because it is heavy
 	SQL := `SELECT 
        			u.id,
        			u.name,

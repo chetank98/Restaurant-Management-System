@@ -51,6 +51,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	txErr := database.Tx(func(tx *sqlx.Tx) error {
+		//todo  use this db call outside transaction
 		userID, existsErr := dbHelper.IsUserExists(body.Email)
 		if existsErr != nil {
 			logrus.Printf("Failed to parse request body: %s", existsErr)
@@ -141,7 +142,9 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// todo :- remove user details also
 func RemoveUser(w http.ResponseWriter, r *http.Request) {
+	//todo :- remove user details
 	id := chi.URLParam(r, "userId")
 	adminCtx := middlewares.UserContext(r)
 	if adminCtx.CurrentRole == models.RoleAdmin {
@@ -291,6 +294,7 @@ func GetRestaurants(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	adminCtx := middlewares.UserContext(r)
+	//TODO use errgroup when mutiple db calls for less time consuming
 	if adminCtx.CurrentRole == models.RoleAdmin || adminCtx.CurrentRole == models.RoleUser {
 		RestaurantsCount, countErr := dbHelper.GetRestaurantsCount(Filters)
 		if countErr != nil {
@@ -304,6 +308,7 @@ func GetRestaurants(w http.ResponseWriter, r *http.Request) {
 			utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Restaurants")
 			return
 		}
+		//TODO  write this  message below else one time
 		logrus.Printf("Get Restaurants successfully.")
 		utils.RespondJSON(w, http.StatusCreated, models.GetRestaurants{
 			Message:     "Get Restaurants successfully.",

@@ -87,6 +87,7 @@ func UpdateRestaurant(restaurantID, name, email, Address, State, City, PinCode s
 }
 
 func CloseMyRestaurant(restaurantID, createdBy string) error {
+	//todo := dont return id
 	// language=SQL
 	SQL := `UPDATE restaurants 
 		SET archived_at = $1
@@ -400,6 +401,7 @@ func GetRestaurantDishByIDAndUserID(restaurantID, dishID, createdBy string) (*mo
 
 func GetRestaurantsCount(Filters models.Filters) (int64, error) {
 	// language=SQL
+	//todo :=  use ilike because it searches matches like case insensetive matching
 	SQL := `SELECT 
        			COUNT(r.id)
 			FROM restaurants r
