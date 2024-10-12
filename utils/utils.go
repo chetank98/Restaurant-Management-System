@@ -274,7 +274,7 @@ func GetFilters(r *http.Request) models.Filters {
 	CreatedBy := r.URL.Query().Get("createdBy")
 	Filters.CreatedBy = CreatedBy
 	SortBy := r.URL.Query().Get("SortBy")
-	//TODO remove case id From switch case because it is already added in default case
+	//TODO remove case id From switch case because it is already added in default case **NO NEED**
 	switch SortBy {
 	case "Id":
 		Filters.SortBy = models.ID

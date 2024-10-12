@@ -2,6 +2,7 @@ package dbHelper
 
 import (
 	"database/sql"
+	"errors"
 	"rms/database"
 	"rms/models"
 	"time"
@@ -40,7 +41,7 @@ func IsRestaurantExists(email string) (bool, error) {
 	err := database.RMS.Get(&restaurantId, SQL, email)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err
@@ -61,7 +62,7 @@ func IsRestaurantIDExists(id string) (bool, error) {
 	err := database.RMS.Get(&restaurantId, SQL, id)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err
@@ -87,12 +88,11 @@ func UpdateRestaurant(restaurantID, name, email, Address, State, City, PinCode s
 }
 
 func CloseMyRestaurant(restaurantID, createdBy string) error {
-	//todo := dont return id
+	//todo := dont return id **DONE**
 	// language=SQL
 	SQL := `UPDATE restaurants 
 		SET archived_at = $1
-		WHERE id = $2 AND created_by = $3
-		RETURNING id;`
+		WHERE id = $2 AND created_by = $3`
 	_, err := database.RMS.Exec(SQL, time.Now(), restaurantID, createdBy)
 	return err
 }
@@ -101,8 +101,7 @@ func CloseRestaurant(restaurantID string) error {
 	// language=SQL
 	SQL := `UPDATE restaurants 
 		SET archived_at = $1
-		WHERE id = $2
-		RETURNING id;`
+		WHERE id = $2`
 	_, err := database.RMS.Exec(SQL, time.Now(), restaurantID)
 	return err
 }
@@ -115,8 +114,7 @@ func UpdateDish(dishID, restaurantId, name, description string, quantity, price,
 			quantity = $3, 
 			price = $4,
 			discount = $5
-		WHERE id = $6 AND restaurants_id = $7
-		RETURNING id;`
+		WHERE id = $6 AND restaurants_id = $7`
 	_, err := database.RMS.Exec(SQL, name, description, quantity, price, discount, dishID, restaurantId)
 	return err
 }
@@ -125,8 +123,7 @@ func RemoveDishByUserID(dishID, restaurantID, createdBy string) error {
 	// language=SQL
 	SQL := `UPDATE dishes 
 		SET archived_at = $1
-		WHERE id = $2 AND restaurants_id = $3 AND created_by = $4
-		RETURNING id;`
+		WHERE id = $2 AND restaurants_id = $3 AND created_by = $4`
 	_, err := database.RMS.Exec(SQL, time.Now(), dishID, restaurantID, createdBy)
 	return err
 }
@@ -135,8 +132,7 @@ func RemoveDish(dishID, restaurantID string) error {
 	// language=SQL
 	SQL := `UPDATE dishes 
 		SET archived_at = $1
-		WHERE id = $2 AND restaurants_id = $3
-		RETURNING id;`
+		WHERE id = $2 AND restaurants_id = $3`
 	_, err := database.RMS.Exec(SQL, time.Now(), dishID, restaurantID)
 	return err
 }
@@ -157,7 +153,7 @@ func GetDishByID(dishID string) (*models.Dishes, error) {
 	var Dish models.Dishes
 	err := database.RMS.Get(&Dish, SQL, dishID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -171,11 +167,11 @@ func GetRestaurantsCountByUserID(createdBy string, Filters models.Filters) (int6
        			COUNT(r.id)
 			FROM restaurants r
 			WHERE r.archived_at IS NULL AND r.created_by = $1 AND
-				r.name LIKE '%' || $2 || '%' AND  r.email LIKE '%' || $3 || '%'`
+				r.name ILIKE '%' || $2 || '%' AND  r.email ILIKE '%' || $3 || '%'`
 	var count int64
 	err := database.RMS.Get(&count, SQL, createdBy, Filters.Name, Filters.Email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, err
@@ -199,7 +195,7 @@ func GetRestaurantsByUserID(createdBy string, Filters models.Filters) ([]models.
 				r.lng
 			FROM restaurants r
 			WHERE r.archived_at IS NULL AND r.created_by = $1 AND
-				r.name LIKE '%' || $2 || '%' AND  r.email LIKE '%' || $3 || '%'
+				r.name ILIKE '%' || $2 || '%' AND  r.email ILIKE '%' || $3 || '%'
 			ORDER BY $4
 			LIMIT $5
 			OFFSET $6`
@@ -230,7 +226,7 @@ func GetRestaurantByID(restaurantId string) (*models.Restaurant, error) {
 	var Restaurant models.Restaurant
 	err := database.RMS.Get(&Restaurant, SQL, restaurantId)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -257,7 +253,7 @@ func GetRestaurantByIDAndUserID(restaurantId, createdBy string) (*models.Restaur
 	var Restaurant models.Restaurant
 	err := database.RMS.Get(&Restaurant, SQL, restaurantId, createdBy)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -270,12 +266,12 @@ func GetRestaurantDishesCount(restaurantID string, Filters models.DishFilters) (
 	SQL := `SELECT 
        			COUNT(d.id)
 			FROM dishes d
-			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.created_by::text LIKE '%' || $2 || '%' AND
-			d.name LIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8`
+			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.created_by::text ILIKE '%' || $2 || '%' AND
+			d.name ILIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8`
 	var count int64
 	err := database.RMS.Get(&count, SQL, restaurantID, Filters.CreatedBy, Filters.Name, Filters.MinQuantity, Filters.MinPrice, Filters.MaxPrice, Filters.MinDiscount, Filters.MaxDiscount)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, err
@@ -295,8 +291,8 @@ func GetRestaurantDishes(restaurantID string, Filters models.DishFilters) ([]mod
        			d.created_at,
        			d.created_by
 			FROM dishes d
-			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.created_by::text LIKE '%' || $2 || '%' AND
-			d.name LIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8
+			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.created_by::text ILIKE '%' || $2 || '%' AND
+			d.name ILIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8
 			ORDER BY $9
 			LIMIT $10
 			OFFSET $11`
@@ -324,7 +320,7 @@ func GetRestaurantDishById(restaurantID, dishID string) (*models.Dishes, error) 
 	var Dishes models.Dishes
 	err := database.RMS.Select(&Dishes, SQL, restaurantID, dishID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -338,11 +334,11 @@ func GetRestaurantDishesCountByUserId(restaurantID, createdBy string, Filters mo
        			COUNT(d.id)
 			FROM dishes d
 			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.created_by = $2 AND 
-			d.name LIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8`
+			d.name ILIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8`
 	var count int64
 	err := database.RMS.Get(&count, SQL, restaurantID, createdBy, Filters.Name, Filters.MinQuantity, Filters.MinPrice, Filters.MaxPrice, Filters.MinDiscount, Filters.MaxDiscount)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, err
@@ -363,7 +359,7 @@ func GetRestaurantDishesByUserID(restaurantID, createdBy string, Filters models.
        			d.created_by
 			FROM dishes d
 			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.created_by = $2 AND 
-			d.name LIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8
+			d.name ILIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8
 			ORDER BY $9
 			LIMIT $10
 			OFFSET $11`
@@ -391,7 +387,7 @@ func GetRestaurantDishByIDAndUserID(restaurantID, dishID, createdBy string) (*mo
 	var Dishes models.Dishes
 	err := database.RMS.Select(&Dishes, SQL, restaurantID, dishID, createdBy)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -401,16 +397,16 @@ func GetRestaurantDishByIDAndUserID(restaurantID, dishID, createdBy string) (*mo
 
 func GetRestaurantsCount(Filters models.Filters) (int64, error) {
 	// language=SQL
-	//todo :=  use ilike because it searches matches like case insensetive matching
+	//todo :=  use ilike because it searches matches like case insensetive matching **DONE**
 	SQL := `SELECT 
        			COUNT(r.id)
 			FROM restaurants r
-			WHERE r.archived_at IS NULL AND r.created_by::text LIKE '%' || $1 || '%'  AND
-				r.name LIKE '%' || $2 || '%' AND  r.email LIKE '%' || $3 || '%'`
+			WHERE r.archived_at IS NULL AND r.created_by::text ILIKE '%' || $1 || '%'  AND
+				r.name ILIKE '%' || $2 || '%' AND  r.email ILIKE '%' || $3 || '%'`
 	var count int64
 	err := database.RMS.Get(&count, SQL, Filters.CreatedBy, Filters.Name, Filters.Email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, err
@@ -433,8 +429,8 @@ func GetRestaurants(Filters models.Filters) ([]models.Restaurant, error) {
 				r.lat,
 				r.lng
 			FROM restaurants r
-			WHERE r.archived_at IS NULL AND r.created_by::text LIKE '%' || $1 || '%'  AND
-				r.name LIKE '%' || $2 || '%' AND  r.email LIKE '%' || $3 || '%'
+			WHERE r.archived_at IS NULL AND r.created_by::text ILIKE '%' || $1 || '%'  AND
+				r.name ILIKE '%' || $2 || '%' AND  r.email ILIKE '%' || $3 || '%'
 			ORDER BY $4
 			LIMIT $5
 			OFFSET $6`

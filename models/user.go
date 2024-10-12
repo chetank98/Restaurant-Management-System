@@ -73,6 +73,12 @@ type Login struct {
 	Message string `json:"message"`
 }
 
+type LoginBody struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     Role   `json:"role"`
+}
+
 type GetSubAdmins struct {
 	Message    string `json:"message"`
 	SubAdmins  []User `json:"subAdmins"`

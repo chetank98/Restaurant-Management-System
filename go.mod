@@ -9,6 +9,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/golang-migrate/migrate/v4 v4.15.1
 	github.com/jmoiron/sqlx v1.3.4
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/lib/pq v1.10.4
 	github.com/rs/cors v1.8.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
@@ -19,5 +20,6 @@ require (
 	github.com/volatiletech/null v8.0.0+incompatible
 	github.com/volatiletech/sqlboiler v3.7.1+incompatible // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+	golang.org/x/sync v0.8.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )

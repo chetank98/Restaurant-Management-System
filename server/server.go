@@ -23,7 +23,6 @@ const (
 
 // SetupRoutes provides all the routes that can be used
 func SetupRoutes() *Server {
-
 	router := chi.NewRouter()
 	router.Route("/v1", func(v1 chi.Router) {
 		v1.Use(middlewares.CommonMiddlewares()...)

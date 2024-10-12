@@ -2,6 +2,7 @@ package dbHelper
 
 import (
 	"database/sql"
+	"errors"
 	"rms/database"
 	"rms/models"
 	"rms/utils"
@@ -34,15 +35,49 @@ func CreateUserAddress(userID, address, state, city, pinCode string, lat, lng fl
 	return err
 }
 
-// todo address will be fetched in this single query not any other db call
+func IsAnyRoleExist(role models.Role) (bool, error) {
+
+	SQL := `SELECT
+				count(*) > 0
+       		FROM
+				user_roles ur 
+			WHERE
+				ur.archived_at IS NULL
+				AND ur.role_name = $1`
+	var isUserRoleId bool
+	err := database.RMS.Get(&isUserRoleId, SQL, role)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return isUserRoleId, nil
+}
+
+// todo address will be fetched in this single query not any other db call **done**
 func GetUserBySession(sessionToken string) (*models.User, error) {
 	// language=SQL
 	SQL := `SELECT 
        			u.id,
        			u.name,
        			u.email,
-				u.password,
-       			u.created_at,ucr.role_name AS user_current_role
+				'********' AS password,
+       			u.created_at,
+				ucr.role_name AS user_current_role,
+				json_agg(
+					json_build_object(
+						'id', ua.id,
+						'address', ua.address,
+						'state', ua.state,
+						'city', ua.city,
+						'pinCode', ua.pin_code,
+						'lat', ua.lat,
+						'lng', ua.lng,
+						'createdAt', ua.created_at
+					)
+				) AS user_addresses
 			FROM users u
 			JOIN user_session us on u.id = us.user_id
 			JOIN user_roles ucr on us.user_role_id = ucr.id
@@ -50,32 +85,33 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 	var user models.User
 	err := database.RMS.Get(&user, SQL, sessionToken)
 	if err != nil {
-		//todo :- I think this condition is unnecessary because you will be return same error mag in both case
-		if err == sql.ErrNoRows {
+		//todo :- I think this condition is unnecessary because you will be return same error mag in both case **done**
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	user.Password = "******"
-	address, addressErr := GetUserAddress(user.ID, user.CurrentRole)
-	if addressErr != nil {
-		return nil, addressErr
-	}
-	user.UserAddresses = address
 	return &user, nil
 }
 
-func GetUserAddress(userID string, userRole models.Role) ([]models.UserAddress, error) {
-	if userRole == models.RoleUser {
-		// language=SQL
-		SQL := `SELECT id, address, state, city, pin_code, lat, lng FROM user_address WHERE user_id = $1 AND archived_at IS NULL`
-		roles := make([]models.UserAddress, 0)
-		err := database.RMS.Select(&roles, SQL, userID)
-		return roles, err
-	} else {
-		return make([]models.UserAddress, 0), nil
+func UserHaveMultipleRoles(id string) (bool, error) {
+	SQL := `SELECT
+				count(*) > 1
+       		FROM
+				user_roles ur
+			WHERE
+				ur.archived_at IS NULL
+				AND ur.user_id = $1`
+	var multipleRoles bool
+	err := database.RMS.Get(&multipleRoles, SQL, id)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
 	}
+	return multipleRoles, nil
 }
 
 func CreateUserSession(db sqlx.Ext, userID, userRoleId, sessionToken string) error {
@@ -103,8 +139,8 @@ func GetUserRoleIDByPassword(email, password string, role models.Role) (string, 
 	var passwordHash string
 	err := database.RMS.QueryRow(SQL, email, role).Scan(&userID, &userRoleId, &passwordHash)
 	if err != nil {
-		//TODO:- remove if condition
-		if err == sql.ErrNoRows {
+		//TODO:- remove if condition **DONE**
+		if errors.Is(err, sql.ErrNoRows) {
 			return "", "", err
 		}
 		return "", "", err
@@ -125,9 +161,9 @@ func DeleteSessionToken(token string) error {
 
 func IsUserRoleExists(email string, role models.Role) (bool, error) {
 	// language=SQL
-	//todo alternate use count(*) > 0
+	//todo alternate use count(*) > 0 **DONE**
 	SQL := `SELECT
-				ur.id
+				count(*) > 0
        		FROM
 				users u JOIN user_roles ur on u.id = ur.user_id
 			WHERE
@@ -135,16 +171,16 @@ func IsUserRoleExists(email string, role models.Role) (bool, error) {
 				AND ur.archived_at IS NULL
 				AND u.email = TRIM(LOWER($1))
 				AND ur.role_name = $2`
-	var userRoleId string
-	err := database.RMS.Get(&userRoleId, SQL, email, role)
+	var isUserRoleId bool
+	err := database.RMS.Get(&isUserRoleId, SQL, email, role)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err
 	}
-	return true, nil
+	return isUserRoleId, nil
 }
 
 func IsUserRoleWithUserIDExists(id string, role models.Role) (bool, error) {
@@ -161,7 +197,7 @@ func IsUserRoleWithUserIDExists(id string, role models.Role) (bool, error) {
 	err := database.RMS.Get(&userRoleId, SQL, id, role)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
 		return false, err
@@ -175,7 +211,7 @@ func IsUserExists(email string) (string, error) {
 	var userId string
 	err := database.RMS.Get(&userId, SQL, email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
 		}
 		return "", err
@@ -189,13 +225,12 @@ func UpdateUserInfo(userID, newName, newEmail, newPassword string) error {
 		SET name = $1, 
 			email = TRIM(LOWER($2)),
 			password = $3
-		WHERE id = $4
-		RETURNING id;`
+		WHERE id = $4`
 	_, err := database.RMS.Exec(SQL, newName, newEmail, newPassword, userID)
 	return err
 }
 
-func RemoveUserByAdminID(userID, createdBy string, role models.Role) error {
+func RemoveRoleByAdminID(userID, createdBy string, role models.Role) error {
 	// language=SQL
 	SQL := `UPDATE user_roles 
 		SET archived_at = $1
@@ -205,12 +240,20 @@ func RemoveUserByAdminID(userID, createdBy string, role models.Role) error {
 	return err
 }
 
-func RemoveUser(userID string, role models.Role) error {
+func RemoveUser(userID string) error {
+	// language=SQL
+	SQL := `UPDATE users 
+		SET archived_at = $1
+		WHERE user_id = $2`
+	_, err := database.RMS.Exec(SQL, time.Now(), userID)
+	return err
+}
+
+func RemoveRole(userID string, role models.Role) error {
 	// language=SQL
 	SQL := `UPDATE user_roles 
 		SET archived_at = $1
-		WHERE user_id = $2 AND role_name = $3
-		RETURNING id;`
+		WHERE user_id = $2 AND role_name = $3`
 	_, err := database.RMS.Exec(SQL, time.Now(), userID, role)
 	return err
 }
@@ -224,8 +267,7 @@ func UpdateUserAddress(AddressID, Address, State, City, PinCode string, Lat, Lng
 			pin_code = $4,
 			lat = $5, 
 			lng = $6
-		WHERE id = $7
-		RETURNING id;`
+		WHERE id = $7`
 	_, err := database.RMS.Exec(SQL, Address, State, City, PinCode, Lat, Lng, AddressID)
 	return err
 }
@@ -254,20 +296,22 @@ func GetUsersByAdminID(createdBy string, role models.Role, Filters models.Filter
 			JOIN user_roles ucr on u.id = ucr.user_id
 			LEFT JOIN user_address ua on u.id = ua.user_id
 			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.created_by=$1 AND ucr.role_name=$2 AND
-			 	u.name LIKE '%' || $3 || '%' AND  u.email LIKE '%' || $4 || '%'
+			 	u.name ILIKE '%' || $3 || '%' AND  u.email ILIKE '%' || $4 || '%'
 			GROUP BY u.id, u.name, u.email, u.password, u.created_at, ucr.role_name
 			ORDER BY $5
 			LIMIT $6
 			OFFSET $7`
-	rows, err := database.RMS.Query(SQL, createdBy, role, Filters.Name, Filters.Email, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
+
+	users := make([]models.User, 0)
+
+	err := database.RMS.Select(&users, SQL, createdBy, role, Filters.Name, Filters.Email, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	//todo use select (database.select)
-	return utils.ImproveUsers(rows)
+	return users, nil
 }
 
 func GetUserCountByAdminID(createdBy string, role models.Role, Filters models.Filters) (int64, error) {
@@ -276,11 +320,11 @@ func GetUserCountByAdminID(createdBy string, role models.Role, Filters models.Fi
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
 			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.created_by=$1 AND ucr.role_name=$2 AND
-			u.name LIKE '%' || $3 || '%' AND  u.email LIKE '%' || $4 || '%'`
+			u.name ILIKE '%' || $3 || '%' AND  u.email ILIKE '%' || $4 || '%'`
 	var count int64
 	err := database.RMS.Get(&count, SQL, createdBy, role, Filters.Name, Filters.Email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, err
@@ -293,12 +337,12 @@ func GetUserCount(role models.Role, Filters models.Filters) (int64, error) {
        			COUNT(ucr.id)
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
-			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1 AND ucr.created_by::text LIKE '%' || $2 || '%' AND
-			u.name LIKE '%' || $3 || '%' AND  u.email LIKE '%' || $4 || '%'`
+			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1 AND ucr.created_by::text ILIKE '%' || $2 || '%' AND
+			u.name ILIKE '%' || $3 || '%' AND  u.email ILIKE '%' || $4 || '%'`
 	var count int64
 	err := database.RMS.Get(&count, SQL, role, Filters.CreatedBy, Filters.Name, Filters.Email)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, err
@@ -308,7 +352,7 @@ func GetUserCount(role models.Role, Filters models.Filters) (int64, error) {
 
 func GetUsers(role models.Role, Filters models.Filters) ([]models.User, error) {
 	// language=SQL
-	//todo avoid using json agg as much as possible because it is heavy
+	//todo avoid using json agg as much as possible because it is heavy **no need**
 	SQL := `SELECT 
        			u.id,
        			u.name,
@@ -330,18 +374,21 @@ func GetUsers(role models.Role, Filters models.Filters) ([]models.User, error) {
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
 			LEFT JOIN user_address ua on u.id = ua.user_id
-			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1 AND ucr.created_by::text LIKE '%' || $2 || '%' AND
-			u.name LIKE '%' || $3 || '%' AND  u.email LIKE '%' || $4 || '%'
+			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1 AND ucr.created_by::text ILIKE '%' || $2 || '%' AND
+			u.name ILIKE '%' || $3 || '%' AND  u.email ILIKE '%' || $4 || '%'
 			GROUP BY u.id, u.name, u.email,u.password, u.created_at, ucr.role_name
 			ORDER BY $5
 			LIMIT $6
 			OFFSET $7`
-	rows, err := database.RMS.Query(SQL, role, Filters.CreatedBy, Filters.Name, Filters.Email, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
+
+	users := make([]models.User, 0)
+
+	err := database.RMS.Select(&users, SQL, role, Filters.CreatedBy, Filters.Name, Filters.Email, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return utils.ImproveUsers(rows)
+	return users, nil
 }
