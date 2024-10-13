@@ -36,6 +36,7 @@ type User struct {
 	Password      string        `json:"password" db:"password"`
 	CreatedAt     time.Time     `json:"createdAt" db:"created_at"`
 	CurrentRole   Role          `json:"currentRole" db:"user_current_role"`
+	RoleID        string        `json:"-" db:"role_id"`
 	UserAddresses []UserAddress `json:"Addresses" db:"user_addresses"`
 }
 

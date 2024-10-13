@@ -53,7 +53,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 func GetInfo(w http.ResponseWriter, r *http.Request) {
 	userCtx := middlewares.UserContext(r)
-	logrus.Errorf("Get information Successfully.")
+	logrus.Infof("Get information Successfully.")
 	utils.RespondJSON(w, http.StatusOK, models.GetUser{
 		Message: "Get information Successfully.",
 		User:    *userCtx,
@@ -85,18 +85,19 @@ func UpdateSelfInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Name == "" {
-		body.Name = adminCtx.Name
+		logrus.Errorf("Invalid Name.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Name.")
+		return
 	}
 	if !utils.IsEmailValid(body.Email) {
-		if body.Email != "" {
-			logrus.Errorf("Invalid Email.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Email.")
-			return
-		}
-		body.Email = adminCtx.Email
+		logrus.Errorf("Invalid Email.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Email.")
+		return
 	}
 	if body.Password == "" {
-		body.Password = adminCtx.Password
+		logrus.Errorf("Invalid Password.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Password.")
+		return
 	} else {
 		hashedPassword, hasErr := utils.HashPassword(body.Password)
 		if hasErr != nil {
@@ -178,77 +179,51 @@ func UpdateAddress(w http.ResponseWriter, r *http.Request) {
 	addressId := chi.URLParam(r, "addressId")
 	var body models.AddUserAddressBody
 
-	userCtx := middlewares.UserContext(r)
 	if parseErr := utils.ParseBody(r.Body, &body); parseErr != nil {
 		logrus.Errorf("Failed to parse request body: %s", parseErr)
 		utils.RespondError(w, http.StatusBadRequest, parseErr, "Failed to parse request body")
 		return
 	}
 
-	userAddress, addressErr := utils.GetUserAddressById(addressId, userCtx.UserAddresses)
-	if addressErr != nil {
-		logrus.Errorf("Address not exist: %s", addressErr)
-		utils.RespondError(w, http.StatusBadRequest, nil, "Address not exist")
+	if len(body.Address) > 30 || len(body.Address) <= 2 {
+		logrus.Errorf("Address must be with in 2 to 30 letter.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Address must be with in 2 to 30 letter.")
 		return
 	}
 
-	if len(body.Address) > 30 || len(body.Address) <= 2 {
-		if body.Address != "" {
-			logrus.Errorf("Address must be with in 2 to 30 letter.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "Address must be with in 2 to 30 letter.")
-			return
-		}
-		body.Address = userAddress.Address
-	}
-
 	if len(body.State) > 16 || len(body.State) <= 2 {
-		if body.State != "" {
-			logrus.Errorf("State must be with in 2 to 16 letter.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "State must be with in 2 to 16 letter.")
-			return
-		}
-		body.State = userAddress.State
+		logrus.Errorf("State must be with in 2 to 16 letter.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "State must be with in 2 to 16 letter.")
+		return
 	}
 
 	if len(body.City) > 20 || len(body.City) <= 2 {
-		if body.City != "" {
-			logrus.Errorf("City must be with in 2 to 20 letter.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "City must be with in 2 to 20 letter.")
-			return
-		}
-		body.City = userAddress.City
+		logrus.Errorf("City must be with in 2 to 20 letter.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "City must be with in 2 to 20 letter.")
+		return
 	}
 
 	if len(body.PinCode) != 6 {
-		if body.PinCode != "" {
-			logrus.Errorf("PinCode must 6 digit.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "PinCode must 6 digit.")
-			return
-		}
-		body.PinCode = userAddress.PinCode
+		logrus.Errorf("PinCode must 6 digit.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "PinCode must 6 digit.")
+		return
 	}
 
 	if body.Lat > 90 || body.Lat < -90 {
-		if body.Lat != 0 {
-			logrus.Errorf("Invalid Latitude.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Latitude.")
-			return
-		}
-		body.Lat = userAddress.Lat
+		logrus.Errorf("Invalid Latitude.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Latitude.")
+		return
 	}
 
 	if body.Lng > 180 || body.Lng < -180 {
-		if body.Lat != 0 {
-			logrus.Errorf("Invalid Longitude.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Longitude.")
-			return
-		}
-		body.Lng = userAddress.Lng
+		logrus.Errorf("Invalid Longitude.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Longitude.")
+		return
 	}
 
 	err := dbHelper.UpdateUserAddress(addressId, body.Address, body.State, body.City, body.PinCode, body.Lat, body.Lng)
 	if err != nil {
-		logrus.Errorf("Failed to update Address: %s", addressErr)
+		logrus.Errorf("Failed to update Address: %s", err)
 		utils.RespondError(w, http.StatusInternalServerError, err, "Failed to update Address:")
 		return
 	}

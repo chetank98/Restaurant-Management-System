@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,13 +35,13 @@ func main() {
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASSWORD"),
 		database.SSLModeDisable); err != nil {
-		logrus.Errorf("Failed to initialize and migrate database with error: %+v", err)
+		logrus.Fatalf("Failed to initialize and migrate database with error: %+v", err)
 	}
 	logrus.Infof("migration successful!!")
 	handler.RegisterAdmin()
 
 	go func() {
-		if err := srv.Run(":8080"); err != nil && err != http.ErrServerClosed {
+		if err := srv.Run(":8080"); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logrus.Errorf("Failed to run server with error: %+v", err)
 		}
 	}()
