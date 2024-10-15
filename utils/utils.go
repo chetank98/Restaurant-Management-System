@@ -251,8 +251,46 @@ func ImproveUsers(rows *sql.Rows) ([]models.User, error) {
 	return users, nil
 }
 
+func UpdateUserAddress(users []models.User, addresses []models.UserAddress) ([]models.User, error) {
+	addressMap := make(map[string][]models.UserAddress)
+	for _, address := range addresses {
+		addressMap[address.UserId] = append(addressMap[address.UserId], address)
+	}
+	for index, user := range users {
+		user.UserAddresses = addressMap[user.ID]
+		users[index] = user
+	}
+
+	return users, nil
+}
+
+func GetValuesFromUser(users []models.User, key string) []string {
+	var values []string
+	for _, user := range users {
+		switch key {
+		case "ID":
+			values = append(values, user.ID)
+		case "Name":
+			values = append(values, user.Name)
+		case "Email":
+			values = append(values, user.Email)
+		case "Password":
+			values = append(values, user.Password)
+		case "CreatedAt":
+			values = append(values, user.CreatedAt.String())
+		case "CurrentRole":
+			values = append(values, string(user.CurrentRole))
+		case "RoleID":
+			values = append(values, user.RoleID)
+		default:
+			values = append(values, user.ID)
+		}
+	}
+	return values
+}
+
 func GetUser(users []models.UserWithAddress) models.User {
-	var addresses []models.UserAddress
+	addresses := make([]models.UserAddress, 0)
 	var user models.User
 	user.ID = users[0].ID
 	user.Name = users[0].Name
@@ -262,16 +300,18 @@ func GetUser(users []models.UserWithAddress) models.User {
 	user.CurrentRole = users[0].CurrentRole
 	user.RoleID = users[0].RoleID
 	for _, user := range users {
-		var address models.UserAddress
-		address.ID = user.AddressID
-		address.Address = user.Address
-		address.State = user.State
-		address.City = user.City
-		address.PinCode = user.PinCode
-		address.Lat = user.Lat
-		address.Lng = user.Lng
-		address.CreatedAt = user.AddressCreatedAt
-		addresses = append(addresses, address)
+		if len(user.Address) > 0 && len(user.State) > 0 && len(user.City) > 0 && len(user.PinCode) == 6 {
+			var address models.UserAddress
+			address.ID = user.AddressID
+			address.Address = user.Address
+			address.State = user.State
+			address.City = user.City
+			address.PinCode = user.PinCode
+			address.Lat = user.Lat
+			address.Lng = user.Lng
+			address.CreatedAt = user.AddressCreatedAt
+			addresses = append(addresses, address)
+		}
 	}
 	user.UserAddresses = addresses
 	return user
@@ -292,7 +332,7 @@ func GetFilters(r *http.Request) models.Filters {
 	} else {
 		Filters.PageSize = 10
 	}
-	logrus.Printf("PageNumber: %d,PageSize: %d", PageNumber, PageSize)
+	logrus.Printf("PageNumber: %d,PageSize: %d", Filters.PageNumber, Filters.PageSize)
 	Name := r.URL.Query().Get("name")
 	Filters.Name = Name
 	Email := r.URL.Query().Get("email")

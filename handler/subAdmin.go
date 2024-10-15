@@ -98,33 +98,41 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	adminCtx := middlewares.UserContext(r)
-	var UserCount int64
-	var Users []models.User
+	var userCount int64
+	users := make([]models.User, 0)
 	var errGroup errgroup.Group
 	if adminCtx.CurrentRole == models.RoleAdmin {
 		errGroup.Go(func() error {
 			var err error
-			UserCount, err = dbHelper.GetUserCount(models.RoleUser, Filters)
-			logrus.Errorf("Unable to get Users Count: %s", err)
+			userCount, err = dbHelper.GetUserCount(models.RoleUser, Filters)
+			if err != nil {
+				logrus.Errorf("Unable to get Users Count: %s", err)
+			}
 			return err
 		})
 		errGroup.Go(func() error {
 			var err error
-			Users, err = dbHelper.GetUsers(models.RoleUser, Filters)
-			logrus.Errorf("Unable to get Users: %s", err)
+			users, err = dbHelper.GetUsers(models.RoleUser, Filters)
+			if err != nil {
+				logrus.Errorf("Unable to get Users: %s", err)
+			}
 			return err
 		})
 	} else {
 		errGroup.Go(func() error {
 			var err error
-			UserCount, err = dbHelper.GetUserCountByAdminID(adminCtx.ID, models.RoleUser, Filters)
-			logrus.Errorf("Unable to get Users Count: %s", err)
+			userCount, err = dbHelper.GetUserCountByAdminID(adminCtx.ID, models.RoleUser, Filters)
+			if err != nil {
+				logrus.Errorf("Unable to get Users Count: %s", err)
+			}
 			return err
 		})
 		errGroup.Go(func() error {
 			var err error
-			Users, err = dbHelper.GetUsersByAdminID(adminCtx.ID, models.RoleUser, Filters)
-			logrus.Errorf("Unable to get Users: %s", err)
+			users, err = dbHelper.GetUsersByAdminID(adminCtx.ID, models.RoleUser, Filters)
+			if err != nil {
+				logrus.Errorf("Unable to get Users: %s", err)
+			}
 			return err
 		})
 	}
@@ -135,8 +143,8 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	logrus.Infof("Get users successfully.")
 	utils.RespondJSON(w, http.StatusOK, models.GetUsers{
 		Message:    "Get users successfully.",
-		Users:      Users,
-		TotalCount: UserCount,
+		Users:      users,
+		TotalCount: userCount,
 		PageSize:   Filters.PageSize,
 		PageNumber: Filters.PageNumber,
 	})

@@ -119,6 +119,7 @@ type UserAddress struct {
 	Lat       float64   `json:"lat" db:"lat"`
 	Lng       float64   `json:"lng" db:"lng"`
 	CreatedAt time.Time `json:"createdAt" db:"created_at"`
+	UserId    string    `json:"-" db:"user_id"`
 }
 
 type AddUserAddressBody struct {

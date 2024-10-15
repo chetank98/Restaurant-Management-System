@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 func RegisterSubAdmin(w http.ResponseWriter, r *http.Request) {
@@ -96,23 +97,34 @@ func GetSubAdmins(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusNotAcceptable, nil, "Invalid Filter Email.")
 		return
 	}
-	UserCount, countErr := dbHelper.GetUserCount(models.RoleSubAdmin, Filters)
-	if countErr != nil {
-		logrus.Errorf("Unable to get Users: %s", countErr)
-		utils.RespondError(w, http.StatusInternalServerError, countErr, "Unable to get Users")
-		return
-	}
-	subAdmins, err := dbHelper.GetUsers(models.RoleSubAdmin, Filters)
-	if err != nil {
-		logrus.Errorf("Unable to get Sub-Admin: %s", err)
-		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get Sub-Admin")
+	var subAdminsCount int64
+	subAdmins := make([]models.User, 0)
+	var errGroup errgroup.Group
+	errGroup.Go(func() error {
+		var err error
+		subAdminsCount, err = dbHelper.GetUserCount(models.RoleSubAdmin, Filters)
+		if err != nil {
+			logrus.Errorf("Unable to get Users Sub-Admin: %s", err)
+		}
+		return err
+	})
+	errGroup.Go(func() error {
+		var err error
+		subAdmins, err = dbHelper.GetUsers(models.RoleSubAdmin, Filters)
+		if err != nil {
+			logrus.Errorf("Unable to get Sub-Admin: %s", err)
+		}
+		return err
+	})
+	if err := errGroup.Wait(); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err, "Unable to get subAdmin")
 		return
 	}
 	logrus.Infof("Get subAdmin successfully.")
 	utils.RespondJSON(w, http.StatusOK, models.GetSubAdmins{
 		Message:    "Get subAdmin successfully.",
 		SubAdmins:  subAdmins,
-		TotalCount: UserCount,
+		TotalCount: subAdminsCount,
 		PageSize:   Filters.PageSize,
 		PageNumber: Filters.PageNumber,
 	})
