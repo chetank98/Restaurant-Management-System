@@ -87,8 +87,7 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 			JOIN user_session us on u.id = us.user_id
 			JOIN user_roles ucr on us.user_role_id = ucr.id
 			LEFT JOIN user_address ua on u.id = ua.user_id
-			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND us.session_token = $1
-			GROUP BY u.id, u.name, u.email,u.password, u.created_at, ucr.role_name`
+			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND us.session_token = $1`
 	var users []models.UserWithAddress
 	err := database.RMS.Select(&users, SQL, sessionToken)
 	if err != nil {
