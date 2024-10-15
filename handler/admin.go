@@ -184,18 +184,18 @@ func RemoveSubAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	txErr := database.Tx(func(tx *sqlx.Tx) error {
 		if multipleRoles {
-			roleErr := dbHelper.RemoveRole(subAdminId, models.RoleUser)
+			roleErr := dbHelper.RemoveRole(tx, subAdminId, models.RoleUser)
 			if roleErr != nil {
 				logrus.Errorf("Failed to Remove Sub-Admin Role: %s", roleErr)
 				return roleErr
 			}
 		} else {
-			roleErr := dbHelper.RemoveRole(subAdminId, models.RoleUser)
+			roleErr := dbHelper.RemoveRole(tx, subAdminId, models.RoleUser)
 			if roleErr != nil {
 				logrus.Errorf("Failed to Remove Sub-Admin Role: %s", roleErr)
 				return roleErr
 			}
-			userErr := dbHelper.RemoveUser(subAdminId)
+			userErr := dbHelper.RemoveUser(tx, subAdminId)
 			if userErr != nil {
 				logrus.Errorf("Failed to remove Sub-Admin: %s", userErr)
 				return userErr

@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS user_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) NOT NULL,
     role_name role_type NOT NULL,
-    created_by UUID REFERENCES users(id), -- Corrected to UUID
+    created_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     archived_at TIMESTAMP WITH TIME ZONE
 );
@@ -33,7 +33,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_role ON user_roles(user_id, role_name) 
 CREATE TABLE IF NOT EXISTS user_session (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_role_id UUID REFERENCES user_roles(id) NOT NULL,
-    user_id UUID REFERENCES users(id) NOT NULL,  -- Corrected table reference to 'users'
+    user_id UUID REFERENCES users(id) NOT NULL,
     session_token TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -42,10 +42,10 @@ CREATE TABLE IF NOT EXISTS user_session (
 CREATE TABLE IF NOT EXISTS user_address (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) NOT NULL,
-    address VARCHAR(30) CHECK (address ~ '^[a-zA-Z0-9\s]*$'),
-    state VARCHAR(16) CHECK (state ~ '^[a-zA-Z\s]*$'),
-    city VARCHAR(20) CHECK (city ~ '^[a-zA-Z\s]*$'),
-    pin_code CHAR(6) CHECK (pin_code ~ '^[0-9]*$'),
+    address TEXT NOT NULL,
+    state TEXT NOT NULL,
+    city TEXT NOT NULL,
+    pin_code CHAR(6),
     lat DOUBLE PRECISION NOT NULL CHECK (lat BETWEEN -90 AND 90),
     lng DOUBLE PRECISION NOT NULL CHECK (lng BETWEEN -180 AND 180),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

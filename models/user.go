@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type Role string
 
@@ -36,7 +38,26 @@ type User struct {
 	Password      string        `json:"password" db:"password"`
 	CreatedAt     time.Time     `json:"createdAt" db:"created_at"`
 	CurrentRole   Role          `json:"currentRole" db:"user_current_role"`
+	RoleID        string        `json:"-" db:"role_id"`
 	UserAddresses []UserAddress `json:"Addresses" db:"user_addresses"`
+}
+
+type UserWithAddress struct {
+	ID               string    `json:"id" db:"id"`
+	Name             string    `json:"name" db:"name"`
+	Email            string    `json:"email" db:"email"`
+	Password         string    `json:"password" db:"password"`
+	CreatedAt        time.Time `json:"createdAt" db:"created_at"`
+	CurrentRole      Role      `json:"currentRole" db:"user_current_role"`
+	RoleID           string    `json:"-" db:"role_id"`
+	AddressID        string    `json:"addressId" db:"address_id"`
+	Address          string    `json:"address" db:"address"`
+	State            string    `json:"state" db:"state"`
+	City             string    `json:"city" db:"city"`
+	PinCode          string    `json:"pinCode" db:"pin_code"`
+	Lat              float64   `json:"lat" db:"lat"`
+	Lng              float64   `json:"lng" db:"lng"`
+	AddressCreatedAt time.Time `json:"addressCreatedAt" db:"address_created_at"`
 }
 
 type Filters struct {

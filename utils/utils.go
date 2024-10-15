@@ -251,6 +251,32 @@ func ImproveUsers(rows *sql.Rows) ([]models.User, error) {
 	return users, nil
 }
 
+func GetUser(users []models.UserWithAddress) models.User {
+	var addresses []models.UserAddress
+	var user models.User
+	user.ID = users[0].ID
+	user.Name = users[0].Name
+	user.Email = users[0].Email
+	user.Password = users[0].Password
+	user.CreatedAt = users[0].CreatedAt
+	user.CurrentRole = users[0].CurrentRole
+	user.RoleID = users[0].RoleID
+	for _, user := range users {
+		var address models.UserAddress
+		address.ID = user.AddressID
+		address.Address = user.Address
+		address.State = user.State
+		address.City = user.City
+		address.PinCode = user.PinCode
+		address.Lat = user.Lat
+		address.Lng = user.Lng
+		address.CreatedAt = user.AddressCreatedAt
+		addresses = append(addresses, address)
+	}
+	user.UserAddresses = addresses
+	return user
+}
+
 // Filters set default value if not
 func GetFilters(r *http.Request) models.Filters {
 	var Filters models.Filters

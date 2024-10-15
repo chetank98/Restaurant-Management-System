@@ -9,23 +9,43 @@ import (
 )
 
 func CreateRestaurant(name, email, createdBy, address, state, city, pinCode string, lat, lng float64) (string, error) {
+	arguments := []interface{}{
+		name,
+		email,
+		createdBy,
+		address,
+		state,
+		city,
+		pinCode,
+		lat,
+		lng,
+	}
 	// language=SQL
 	SQL := `INSERT INTO restaurants(name, email, created_by, address, state, city, pin_code, lat, lng) VALUES ($1, TRIM(LOWER($2)), $3, $4, $5, $6, $7, $8, $9) RETURNING id`
-	var userID string
-	if err := database.RMS.QueryRowx(SQL, name, email, createdBy, address, state, city, pinCode, lat, lng).Scan(&userID); err != nil {
+	var restaurantID string
+	if err := database.RMS.QueryRowx(SQL, arguments...).Scan(&restaurantID); err != nil {
 		return "", err
 	}
-	return userID, nil
+	return restaurantID, nil
 }
 
 func CreateDish(restaurantID, createdBy, name, description string, quantity, price, discount int64) (string, error) {
+	arguments := []interface{}{
+		restaurantID,
+		quantity,
+		price,
+		discount,
+		createdBy,
+		name,
+		description,
+	}
 	// language=SQL
 	SQL := `INSERT INTO dishes(restaurants_id, quantity, price, discount, created_by, name, description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
-	var userID string
-	if err := database.RMS.QueryRowx(SQL, restaurantID, quantity, price, discount, createdBy, name, description).Scan(&userID); err != nil {
+	var dishID string
+	if err := database.RMS.QueryRowx(SQL, arguments...).Scan(&dishID); err != nil {
 		return "", err
 	}
-	return userID, nil
+	return dishID, nil
 }
 
 func IsRestaurantExists(email string) (bool, error) {
@@ -71,6 +91,17 @@ func IsRestaurantIDExists(id string) (bool, error) {
 }
 
 func UpdateRestaurant(restaurantID, name, email, Address, State, City, PinCode string, Lat, Lng float64) error {
+	arguments := []interface{}{
+		name,
+		email,
+		Address,
+		State,
+		City,
+		PinCode,
+		Lat,
+		Lng,
+		restaurantID,
+	}
 	// language=SQL
 	SQL := `UPDATE restaurants
 		SET name = $1,
@@ -83,7 +114,7 @@ func UpdateRestaurant(restaurantID, name, email, Address, State, City, PinCode s
 			lng = $8
 		WHERE id = $9
 		RETURNING id;`
-	_, err := database.RMS.Exec(SQL, name, email, Address, State, City, PinCode, Lat, Lng, restaurantID)
+	_, err := database.RMS.Exec(SQL, arguments...)
 	return err
 }
 
@@ -107,6 +138,15 @@ func CloseRestaurant(restaurantID string) error {
 }
 
 func UpdateDish(dishID, restaurantId, name, description string, quantity, price, discount int64) error {
+	arguments := []interface{}{
+		name,
+		description,
+		quantity,
+		price,
+		discount,
+		dishID,
+		restaurantId,
+	}
 	// language=SQL
 	SQL := `UPDATE dishes
 		SET name = $1,
@@ -115,7 +155,7 @@ func UpdateDish(dishID, restaurantId, name, description string, quantity, price,
 			price = $4,
 			discount = $5
 		WHERE id = $6 AND restaurants_id = $7`
-	_, err := database.RMS.Exec(SQL, name, description, quantity, price, discount, dishID, restaurantId)
+	_, err := database.RMS.Exec(SQL, arguments...)
 	return err
 }
 
@@ -180,6 +220,14 @@ func GetRestaurantsCountByUserID(createdBy string, Filters models.Filters) (int6
 }
 
 func GetRestaurantsByUserID(createdBy string, Filters models.Filters) ([]models.Restaurant, error) {
+	arguments := []interface{}{
+		createdBy,
+		Filters.Name,
+		Filters.Email,
+		Filters.SortBy,
+		Filters.PageSize,
+		Filters.PageSize * Filters.PageNumber,
+	}
 	// language=SQL
 	SQL := `SELECT 
        			r.id,
@@ -199,12 +247,12 @@ func GetRestaurantsByUserID(createdBy string, Filters models.Filters) ([]models.
 			ORDER BY $4
 			LIMIT $5
 			OFFSET $6`
-	Restaurant := make([]models.Restaurant, 0)
-	err := database.RMS.Select(&Restaurant, SQL, createdBy, Filters.Name, Filters.Email, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
+	restaurant := make([]models.Restaurant, 0)
+	err := database.RMS.Select(&restaurant, SQL, arguments...)
 	if err != nil {
 		return nil, err
 	}
-	return Restaurant, nil
+	return restaurant, nil
 }
 
 func GetRestaurantByID(restaurantId string) (*models.Restaurant, error) {
@@ -223,15 +271,15 @@ func GetRestaurantByID(restaurantId string) (*models.Restaurant, error) {
 				r.lng
 			FROM restaurants r
 			WHERE r.archived_at IS NULL AND r.id = $1`
-	var Restaurant models.Restaurant
-	err := database.RMS.Get(&Restaurant, SQL, restaurantId)
+	var restaurant models.Restaurant
+	err := database.RMS.Get(&restaurant, SQL, restaurantId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &Restaurant, nil
+	return &restaurant, nil
 }
 
 func GetRestaurantByIDAndUserID(restaurantId, createdBy string) (*models.Restaurant, error) {
@@ -250,18 +298,28 @@ func GetRestaurantByIDAndUserID(restaurantId, createdBy string) (*models.Restaur
 				r.lng
 			FROM restaurants r
 			WHERE r.archived_at IS NULL AND r.restaurants_id = $1 AND r.created_by = $2`
-	var Restaurant models.Restaurant
-	err := database.RMS.Get(&Restaurant, SQL, restaurantId, createdBy)
+	var restaurant models.Restaurant
+	err := database.RMS.Get(&restaurant, SQL, restaurantId, createdBy)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &Restaurant, nil
+	return &restaurant, nil
 }
 
 func GetRestaurantDishesCount(restaurantID string, Filters models.DishFilters) (int64, error) {
+	arguments := []interface{}{
+		restaurantID,
+		Filters.CreatedBy,
+		Filters.Name,
+		Filters.MinQuantity,
+		Filters.MinPrice,
+		Filters.MaxPrice,
+		Filters.MinDiscount,
+		Filters.MaxDiscount,
+	}
 	// language=SQL
 	SQL := `SELECT 
        			COUNT(d.id)
@@ -269,7 +327,7 @@ func GetRestaurantDishesCount(restaurantID string, Filters models.DishFilters) (
 			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.created_by::text ILIKE '%' || $2 || '%' AND
 			d.name ILIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8`
 	var count int64
-	err := database.RMS.Get(&count, SQL, restaurantID, Filters.CreatedBy, Filters.Name, Filters.MinQuantity, Filters.MinPrice, Filters.MaxPrice, Filters.MinDiscount, Filters.MaxDiscount)
+	err := database.RMS.Get(&count, SQL, arguments...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
@@ -280,6 +338,19 @@ func GetRestaurantDishesCount(restaurantID string, Filters models.DishFilters) (
 }
 
 func GetRestaurantDishes(restaurantID string, Filters models.DishFilters) ([]models.Dishes, error) {
+	arguments := []interface{}{
+		restaurantID,
+		Filters.CreatedBy,
+		Filters.Name,
+		Filters.MinQuantity,
+		Filters.MinPrice,
+		Filters.MaxPrice,
+		Filters.MinDiscount,
+		Filters.MaxDiscount,
+		Filters.SortBy,
+		Filters.PageSize,
+		Filters.PageSize * Filters.PageNumber,
+	}
 	// language=SQL
 	SQL := `SELECT 
        			d.id,
@@ -296,12 +367,12 @@ func GetRestaurantDishes(restaurantID string, Filters models.DishFilters) ([]mod
 			ORDER BY $9
 			LIMIT $10
 			OFFSET $11`
-	Dishes := make([]models.Dishes, 0)
-	err := database.RMS.Select(&Dishes, SQL, restaurantID, Filters.CreatedBy, Filters.Name, Filters.MinQuantity, Filters.MinPrice, Filters.MaxPrice, Filters.MinDiscount, Filters.MaxDiscount, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
+	dishes := make([]models.Dishes, 0)
+	err := database.RMS.Select(&dishes, SQL, arguments...)
 	if err != nil {
 		return nil, err
 	}
-	return Dishes, nil
+	return dishes, nil
 }
 
 func GetRestaurantDishById(restaurantID, dishID string) (*models.Dishes, error) {
@@ -317,18 +388,28 @@ func GetRestaurantDishById(restaurantID, dishID string) (*models.Dishes, error) 
        			d.created_by
 			FROM dishes d
 			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.id = $2`
-	var Dishes models.Dishes
-	err := database.RMS.Select(&Dishes, SQL, restaurantID, dishID)
+	var dishes models.Dishes
+	err := database.RMS.Select(&dishes, SQL, restaurantID, dishID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &Dishes, nil
+	return &dishes, nil
 }
 
 func GetRestaurantDishesCountByUserId(restaurantID, createdBy string, Filters models.DishFilters) (int64, error) {
+	arguments := []interface{}{
+		restaurantID,
+		createdBy,
+		Filters.Name,
+		Filters.MinQuantity,
+		Filters.MinPrice,
+		Filters.MaxPrice,
+		Filters.MinDiscount,
+		Filters.MaxDiscount,
+	}
 	// language=SQL
 	SQL := `SELECT 
        			COUNT(d.id)
@@ -336,7 +417,7 @@ func GetRestaurantDishesCountByUserId(restaurantID, createdBy string, Filters mo
 			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.created_by = $2 AND 
 			d.name ILIKE '%' || $3 || '%' AND  d.quantity > $4 AND d.price BETWEEN $5 AND $6 AND d.discount BETWEEN $7 AND $8`
 	var count int64
-	err := database.RMS.Get(&count, SQL, restaurantID, createdBy, Filters.Name, Filters.MinQuantity, Filters.MinPrice, Filters.MaxPrice, Filters.MinDiscount, Filters.MaxDiscount)
+	err := database.RMS.Get(&count, SQL, arguments...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
@@ -347,6 +428,19 @@ func GetRestaurantDishesCountByUserId(restaurantID, createdBy string, Filters mo
 }
 
 func GetRestaurantDishesByUserID(restaurantID, createdBy string, Filters models.DishFilters) ([]models.Dishes, error) {
+	arguments := []interface{}{
+		restaurantID,
+		createdBy,
+		Filters.Name,
+		Filters.MinQuantity,
+		Filters.MinPrice,
+		Filters.MaxPrice,
+		Filters.MinDiscount,
+		Filters.MaxDiscount,
+		Filters.SortBy,
+		Filters.PageSize,
+		Filters.PageSize * Filters.PageNumber,
+	}
 	// language=SQL
 	SQL := `SELECT 
        			d.id,
@@ -363,12 +457,12 @@ func GetRestaurantDishesByUserID(restaurantID, createdBy string, Filters models.
 			ORDER BY $9
 			LIMIT $10
 			OFFSET $11`
-	Dishes := make([]models.Dishes, 0)
-	err := database.RMS.Select(&Dishes, SQL, restaurantID, createdBy, Filters.Name, Filters.MinQuantity, Filters.MinPrice, Filters.MaxPrice, Filters.MinDiscount, Filters.MaxDiscount, Filters.SortBy, Filters.PageSize, Filters.PageSize*Filters.PageNumber)
+	dishes := make([]models.Dishes, 0)
+	err := database.RMS.Select(&dishes, SQL, arguments...)
 	if err != nil {
 		return nil, err
 	}
-	return Dishes, nil
+	return dishes, nil
 }
 
 func GetRestaurantDishByIDAndUserID(restaurantID, dishID, createdBy string) (*models.Dishes, error) {
@@ -384,15 +478,15 @@ func GetRestaurantDishByIDAndUserID(restaurantID, dishID, createdBy string) (*mo
        			d.created_by
 			FROM dishes d
 			WHERE d.archived_at IS NULL AND d.restaurants_id = $1 AND d.id = $2 AND d.created_by = $3`
-	var Dishes models.Dishes
-	err := database.RMS.Select(&Dishes, SQL, restaurantID, dishID, createdBy)
+	var dishes models.Dishes
+	err := database.RMS.Select(&dishes, SQL, restaurantID, dishID, createdBy)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	return &Dishes, nil
+	return &dishes, nil
 }
 
 func GetRestaurantsCount(Filters models.Filters) (int64, error) {
@@ -415,6 +509,14 @@ func GetRestaurantsCount(Filters models.Filters) (int64, error) {
 }
 
 func GetRestaurants(Filters models.Filters) ([]models.Restaurant, error) {
+	arguments := []interface{}{
+		Filters.CreatedBy,
+		Filters.Name,
+		Filters.Email,
+		Filters.SortBy,
+		Filters.PageSize,
+		Filters.PageNumber * Filters.PageSize,
+	}
 	// language=SQL
 	SQL := `SELECT 
        			r.id,
@@ -434,10 +536,10 @@ func GetRestaurants(Filters models.Filters) ([]models.Restaurant, error) {
 			ORDER BY $4
 			LIMIT $5
 			OFFSET $6`
-	Restaurant := make([]models.Restaurant, 0)
-	err := database.RMS.Select(&Restaurant, SQL, Filters.CreatedBy, Filters.Name, Filters.Email, Filters.SortBy, Filters.PageSize, Filters.PageNumber*Filters.PageSize)
+	restaurants := make([]models.Restaurant, 0)
+	err := database.RMS.Select(&restaurants, SQL, arguments...)
 	if err != nil {
 		return nil, err
 	}
-	return Restaurant, nil
+	return restaurants, nil
 }

@@ -156,18 +156,18 @@ func RemoveUser(w http.ResponseWriter, r *http.Request) {
 	if adminCtx.CurrentRole == models.RoleAdmin {
 		txErr := database.Tx(func(tx *sqlx.Tx) error {
 			if multipleRoles {
-				roleErr := dbHelper.RemoveRole(id, models.RoleUser)
+				roleErr := dbHelper.RemoveRole(tx, id, models.RoleUser)
 				if roleErr != nil {
 					logrus.Errorf("Failed to Remove User Role: %s", roleErr)
 					return roleErr
 				}
 			} else {
-				roleErr := dbHelper.RemoveRole(id, models.RoleUser)
+				roleErr := dbHelper.RemoveRole(tx, id, models.RoleUser)
 				if roleErr != nil {
 					logrus.Errorf("Failed to Remove User Role: %s", roleErr)
 					return roleErr
 				}
-				userErr := dbHelper.RemoveUser(id)
+				userErr := dbHelper.RemoveUser(tx, id)
 				if userErr != nil {
 					logrus.Errorf("Failed to remove User: %s", userErr)
 					return userErr
@@ -183,18 +183,18 @@ func RemoveUser(w http.ResponseWriter, r *http.Request) {
 	} else {
 		txErr := database.Tx(func(tx *sqlx.Tx) error {
 			if multipleRoles {
-				saveErr := dbHelper.RemoveRoleByAdminID(id, adminCtx.ID, models.RoleUser)
+				saveErr := dbHelper.RemoveRoleByAdminID(tx, id, adminCtx.ID, models.RoleUser)
 				if saveErr != nil {
 					logrus.Errorf("Failed to parse request body: %s", saveErr)
 					return saveErr
 				}
 			} else {
-				saveErr := dbHelper.RemoveRoleByAdminID(id, adminCtx.ID, models.RoleUser)
+				saveErr := dbHelper.RemoveRoleByAdminID(tx, id, adminCtx.ID, models.RoleUser)
 				if saveErr != nil {
 					logrus.Errorf("Failed to parse request body: %s", saveErr)
 					return saveErr
 				}
-				roleErr := dbHelper.RemoveUser(id)
+				roleErr := dbHelper.RemoveUser(tx, id)
 				if roleErr != nil {
 					logrus.Errorf("Failed to parse request body: %s", roleErr)
 					return roleErr
@@ -257,21 +257,21 @@ func OpenRestaurant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(body.Address) > 30 || len(body.Address) <= 2 {
-		logrus.Errorf("Address must be with in 2 to 30 letter.")
-		utils.RespondError(w, http.StatusExpectationFailed, nil, "Address must be with in 2 to 30 letter.")
+	if len(body.Address) == 0 {
+		logrus.Errorf("Address can't be null.")
+		utils.RespondError(w, http.StatusExpectationFailed, nil, "Address can't be null.")
 		return
 	}
 
-	if len(body.State) > 16 || len(body.State) <= 2 {
-		logrus.Errorf("State must be with in 2 to 16 letter.")
-		utils.RespondError(w, http.StatusExpectationFailed, nil, "State must be with in 2 to 16 letter.")
+	if len(body.State) == 0 {
+		logrus.Errorf("State can't be null.")
+		utils.RespondError(w, http.StatusExpectationFailed, nil, "State can't be null.")
 		return
 	}
 
-	if len(body.City) > 20 || len(body.City) <= 2 {
-		logrus.Errorf("City must be with in 2 to 20 letter.")
-		utils.RespondError(w, http.StatusExpectationFailed, nil, "City must be with in 2 to 20 letter.")
+	if len(body.City) == 0 {
+		logrus.Errorf("City can't be null.")
+		utils.RespondError(w, http.StatusExpectationFailed, nil, "City can't be null.")
 		return
 	}
 
@@ -319,7 +319,7 @@ func CloseRestaurant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logrus.Infof("Restaurant Closed successfully.")
-	utils.RespondJSON(w, http.StatusCreated, models.Message{
+	utils.RespondJSON(w, http.StatusOK, models.Message{
 		Message: "Restaurant Closed successfully.",
 	})
 }
@@ -403,69 +403,50 @@ func UpdateRestaurant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if body.Name == "" {
-		body.Name = restaurant.Name
+		logrus.Errorf("Invalid Restaurant Name.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Restaurant Name")
+		return
 	}
 	if !utils.IsEmailValid(body.Email) {
-		if body.Email != "" {
-			logrus.Errorf("Invalid Email.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Email")
-			return
-		}
-		body.Email = restaurant.Email
+		logrus.Errorf("Invalid Restaurant Email.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Restaurant Email")
+		return
 	}
 
-	if len(body.Address) > 30 || len(body.Address) <= 2 {
-		if body.Address != "" {
-			logrus.Errorf("Address must be with in 2 to 30 letter.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "Address must be with in 2 to 30 letter.")
-			return
-		}
-		body.Address = restaurant.Address
+	if len(body.Address) == 0 {
+		logrus.Errorf("Address can't be null.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Address can't be null.")
+		return
 	}
 
-	if len(body.State) > 16 || len(body.State) <= 2 {
-		if body.State != "" {
-			logrus.Errorf("State must be with in 2 to 16 letter.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "State must be with in 2 to 16 letter.")
-			return
-		}
-		body.State = restaurant.State
+	if len(body.State) == 0 {
+		logrus.Errorf("State can't be null.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "State can't be null.")
+		return
 	}
 
-	if len(body.City) > 20 || len(body.City) <= 2 {
-		if body.City != "" {
-			logrus.Errorf("City must be with in 2 to 20 letter.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "City must be with in 2 to 20 letter.")
-			return
-		}
-		body.City = restaurant.City
+	if len(body.City) == 0 {
+		logrus.Errorf("City can't be null.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "City can't be null.")
+		return
 	}
 
 	if len(body.PinCode) != 6 {
-		if body.PinCode != "" {
-			logrus.Errorf("PinCode must 6 digit.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "PinCode must 6 digit.")
-			return
-		}
-		body.PinCode = restaurant.PinCode
+		logrus.Errorf("PinCode must 6 digit.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "PinCode must 6 digit.")
+		return
 	}
 
 	if body.Lat > 90 || body.Lat < -90 {
-		if body.Lat != 0 {
-			logrus.Errorf("Invalid Latitude.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Latitude.")
-			return
-		}
-		body.Lat = restaurant.Lat
+		logrus.Errorf("Invalid Latitude.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Latitude.")
+		return
 	}
 
 	if body.Lng > 180 || body.Lng < -180 {
-		if body.Lat != 0 {
-			logrus.Errorf("Invalid Longitude.")
-			utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Longitude.")
-			return
-		}
-		body.Lng = restaurant.Lng
+		logrus.Errorf("Invalid Longitude.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Longitude.")
+		return
 	}
 
 	err := dbHelper.UpdateRestaurant(restaurantId, body.Name, body.Email, body.Address, body.State, body.City, body.PinCode, body.Lat, body.Lng)
@@ -572,19 +553,27 @@ func UpdateDish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if body.Name == "" {
-		body.Name = dish.Name
+		logrus.Errorf("Invalid Name.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Name.")
+		return
 	}
 
 	if body.Description == "" {
-		body.Name = dish.Description
+		logrus.Errorf("Invalid Description.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Description.")
+		return
 	}
 
 	if body.Quantity <= 0 {
-		body.Quantity = dish.Quantity
+		logrus.Errorf("Invalid Quantity.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Quantity.")
+		return
 	}
 
 	if body.Price <= 0 {
-		body.Price = dish.Price
+		logrus.Errorf("Invalid Price.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Invalid Price.")
+		return
 	}
 
 	if body.Discount > 100 || body.Discount < 0 {
