@@ -5,12 +5,13 @@ CREATE TABLE IF NOT EXISTS restaurants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     email TEXT NOT NULL,
-    address VARCHAR(30) CHECK (address ~ '^[a-zA-Z0-9\s]*$'),
-    state VARCHAR(16) CHECK (state ~ '^[a-zA-Z\s]*$'),
-    city VARCHAR(20) CHECK (city ~ '^[a-zA-Z\s]*$'),
-    pin_code CHAR(6) CHECK (pin_code ~ '^[0-9]*$'),
+    address TEXT NOT NULL,
+    state TEXT NOT NULL,
+    city TEXT NOT NULL,
+    pin_code CHAR(6),
     lat DOUBLE PRECISION NOT NULL CHECK (lat BETWEEN -90 AND 90),
     lng DOUBLE PRECISION NOT NULL CHECK (lng BETWEEN -180 AND 180),
+    created_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     archived_at TIMESTAMP WITH TIME ZONE
 );

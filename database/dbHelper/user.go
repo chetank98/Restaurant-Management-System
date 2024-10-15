@@ -75,26 +75,22 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 				'********' AS password,
        			u.created_at,
 				ucr.role_name AS user_current_role,
-				json_agg(
-					json_build_object(
-						'id', ua.id,
-						'address', ua.address,
-						'state', ua.state,
-						'city', ua.city,
-						'pinCode', ua.pin_code,
-						'lat', ua.lat,
-						'lng', ua.lng,
-						'createdAt', ua.created_at
-					)
-				) AS user_addresses
+				ua.id as address_id,
+				ua.address,
+				ua.state,
+				ua.city,
+				ua.pin_code,
+				ua.lat,
+				ua.lng,
+				ua.address_created_at,
 			FROM users u
 			JOIN user_session us on u.id = us.user_id
 			JOIN user_roles ucr on us.user_role_id = ucr.id
 			LEFT JOIN user_address ua on u.id = ua.user_id
 			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND us.session_token = $1
 			GROUP BY u.id, u.name, u.email,u.password, u.created_at, ucr.role_name`
-	var user models.User
-	err := database.RMS.Get(&user, SQL, sessionToken)
+	var users []models.UserWithAddress
+	err := database.RMS.Select(&users, SQL, sessionToken)
 	if err != nil {
 		//todo :- I think this condition is unnecessary because you will be return same error mag in both case **done**
 		if errors.Is(err, sql.ErrNoRows) {
@@ -102,6 +98,7 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 		}
 		return nil, err
 	}
+	user := utils.GetUser(users)
 	return &user, nil
 }
 
@@ -335,13 +332,11 @@ func GetUsersByAdminID(createdBy string, role models.Role, Filters models.Filter
 			LIMIT $6
 			OFFSET $7`
 
-	users := make([]models.User, 0)
-
-	err := database.RMS.Select(&users, SQL, arguments...)
+	rows, err := database.RMS.Query(SQL, arguments...)
 	if err != nil {
 		return nil, err
 	}
-	return users, nil
+	return utils.ImproveUsers(rows)
 }
 
 func GetUserCountByAdminID(createdBy string, role models.Role, Filters models.Filters) (int64, error) {
@@ -432,11 +427,9 @@ func GetUsers(role models.Role, Filters models.Filters) ([]models.User, error) {
 			LIMIT $6
 			OFFSET $7`
 
-	users := make([]models.User, 0)
-
-	err := database.RMS.Select(&users, SQL, arguments...)
+	rows, err := database.RMS.Query(SQL, arguments...)
 	if err != nil {
 		return nil, err
 	}
-	return users, nil
+	return utils.ImproveUsers(rows)
 }

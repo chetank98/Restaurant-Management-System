@@ -257,21 +257,21 @@ func OpenRestaurant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(body.Address) > 30 || len(body.Address) <= 2 {
-		logrus.Errorf("Address must be with in 2 to 30 letter.")
-		utils.RespondError(w, http.StatusExpectationFailed, nil, "Address must be with in 2 to 30 letter.")
+	if len(body.Address) == 0 {
+		logrus.Errorf("Address can't be null.")
+		utils.RespondError(w, http.StatusExpectationFailed, nil, "Address can't be null.")
 		return
 	}
 
-	if len(body.State) > 16 || len(body.State) <= 2 {
-		logrus.Errorf("State must be with in 2 to 16 letter.")
-		utils.RespondError(w, http.StatusExpectationFailed, nil, "State must be with in 2 to 16 letter.")
+	if len(body.State) == 0 {
+		logrus.Errorf("State can't be null.")
+		utils.RespondError(w, http.StatusExpectationFailed, nil, "State can't be null.")
 		return
 	}
 
-	if len(body.City) > 20 || len(body.City) <= 2 {
-		logrus.Errorf("City must be with in 2 to 20 letter.")
-		utils.RespondError(w, http.StatusExpectationFailed, nil, "City must be with in 2 to 20 letter.")
+	if len(body.City) == 0 {
+		logrus.Errorf("City can't be null.")
+		utils.RespondError(w, http.StatusExpectationFailed, nil, "City can't be null.")
 		return
 	}
 
@@ -413,21 +413,21 @@ func UpdateRestaurant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(body.Address) > 30 || len(body.Address) <= 2 {
-		logrus.Errorf("Address must be with in 2 to 30 letter.")
-		utils.RespondError(w, http.StatusBadRequest, nil, "Address must be with in 2 to 30 letter.")
+	if len(body.Address) == 0 {
+		logrus.Errorf("Address can't be null.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "Address can't be null.")
 		return
 	}
 
-	if len(body.State) > 16 || len(body.State) <= 2 {
-		logrus.Errorf("State must be with in 2 to 16 letter.")
-		utils.RespondError(w, http.StatusBadRequest, nil, "State must be with in 2 to 16 letter.")
+	if len(body.State) == 0 {
+		logrus.Errorf("State can't be null.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "State can't be null.")
 		return
 	}
 
-	if len(body.City) > 20 || len(body.City) <= 2 {
-		logrus.Errorf("City must be with in 2 to 20 letter.")
-		utils.RespondError(w, http.StatusBadRequest, nil, "City must be with in 2 to 20 letter.")
+	if len(body.City) == 0 {
+		logrus.Errorf("City can't be null.")
+		utils.RespondError(w, http.StatusBadRequest, nil, "City can't be null.")
 		return
 	}
 
