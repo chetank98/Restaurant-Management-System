@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 func CreateUser(db sqlx.Ext, name, email, password string) (string, error) {
@@ -26,6 +27,32 @@ func CreateUserRole(db sqlx.Ext, userID, createdBy string, role models.Role) err
 	SQL := `INSERT INTO user_roles(user_id, created_by, role_name) VALUES ($1, $2, $3)`
 	_, err := db.Exec(SQL, userID, createdBy, role)
 	return err
+}
+
+func GetAddressesByUserIDs(userIDs []string) ([]models.UserAddress, error) {
+
+	// language=SQL
+	SQL := `SELECT
+				ua.id,
+				ua.address,
+				ua.state,
+				ua.city,
+				ua.pin_code,
+				ua.lat,
+				ua.lng,
+				ua.created_at,
+				ua.user_id
+			FROM user_address ua
+			WHERE ua.archived_at IS NULL AND ua.user_id::text = any($1)`
+	addresses := make([]models.UserAddress, 0)
+
+	err := database.RMS.Select(&addresses, SQL, pq.StringArray(userIDs))
+
+	if err != nil {
+		//todo :- I think this condition is unnecessary because you will be return same error mag in both case **done**
+		return nil, err
+	}
+	return addresses, nil
 }
 
 func CreateUserAddress(userID, address, state, city, pinCode string, lat, lng float64) error {
@@ -75,14 +102,14 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 				'********' AS password,
        			u.created_at,
 				ucr.role_name AS user_current_role,
-				ua.id as address_id,
-				ua.address,
-				ua.state,
-				ua.city,
-				ua.pin_code,
-				ua.lat,
-				ua.lng,
-				ua.address_created_at,
+				COALESCE(ua.id,gen_random_uuid()) AS address_id,
+				COALESCE(ua.address,'') AS address,
+				COALESCE(ua.state,'') AS state,
+				COALESCE(ua.city,'') AS city,
+				COALESCE(ua.pin_code,'') AS pin_code,
+				COALESCE(ua.lat,0) AS lat,
+				COALESCE(ua.lng,0) AS lng,
+				COALESCE(ua.created_at,now()) AS address_created_at
 			FROM users u
 			JOIN user_session us on u.id = us.user_id
 			JOIN user_roles ucr on us.user_role_id = ucr.id
@@ -90,11 +117,9 @@ func GetUserBySession(sessionToken string) (*models.User, error) {
 			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND us.session_token = $1`
 	var users []models.UserWithAddress
 	err := database.RMS.Select(&users, SQL, sessionToken)
+
 	if err != nil {
 		//todo :- I think this condition is unnecessary because you will be return same error mag in both case **done**
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	user := utils.GetUser(users)
@@ -308,34 +333,29 @@ func GetUsersByAdminID(createdBy string, role models.Role, Filters models.Filter
        			u.name,
        			u.email,
        			u.created_at,
-				ucr.role_name AS user_current_role,
-				json_agg(
-					json_build_object(
-						'id', ua.id,
-						'address', ua.address,
-						'state', ua.state,
-						'city', ua.city,
-						'pinCode', ua.pin_code,
-						'lat', ua.lat,
-						'lng', ua.lng,
-						'createdAt', ua.created_at
-					)
-				) AS user_addresses
+				ucr.role_name AS user_current_role
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
-			LEFT JOIN user_address ua on u.id = ua.user_id
 			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.created_by=$1 AND ucr.role_name=$2 AND
 			 	u.name ILIKE '%' || $3 || '%' AND  u.email ILIKE '%' || $4 || '%'
-			GROUP BY u.id, u.name, u.email, u.password, u.created_at, ucr.role_name
 			ORDER BY $5
 			LIMIT $6
 			OFFSET $7`
 
-	rows, err := database.RMS.Query(SQL, arguments...)
+	users := make([]models.User, 0)
+	err := database.RMS.Select(&users, SQL, arguments...)
+
 	if err != nil {
 		return nil, err
 	}
-	return utils.ImproveUsers(rows)
+	userIDs := utils.GetValuesFromUser(users, "ID")
+
+	addresses, addressErr := GetAddressesByUserIDs(userIDs)
+
+	if addressErr != nil {
+		return nil, err
+	}
+	return utils.UpdateUserAddress(users, addresses)
 }
 
 func GetUserCountByAdminID(createdBy string, role models.Role, Filters models.Filters) (int64, error) {
@@ -403,32 +423,28 @@ func GetUsers(role models.Role, Filters models.Filters) ([]models.User, error) {
        			u.name,
        			u.email,
        			u.created_at,
-				ucr.role_name AS user_current_role,
-				json_agg(
-					json_build_object(
-						'id', ua.id,
-						'address', ua.address,
-						'state', ua.state,
-						'city', ua.city,
-						'pinCode', ua.pin_code,
-						'lat', ua.lat,
-						'lng', ua.lng,
-						'createdAt', ua.created_at
-					)
-				) AS user_addresses
+				ucr.role_name AS user_current_role
 			FROM users u
 			JOIN user_roles ucr on u.id = ucr.user_id
-			LEFT JOIN user_address ua on u.id = ua.user_id
 			WHERE u.archived_at IS NULL AND ucr.archived_at IS NULL AND ucr.role_name=$1 AND ucr.created_by::text ILIKE '%' || $2 || '%' AND
 			u.name ILIKE '%' || $3 || '%' AND  u.email ILIKE '%' || $4 || '%'
-			GROUP BY u.id, u.name, u.email,u.password, u.created_at, ucr.role_name
 			ORDER BY $5
 			LIMIT $6
 			OFFSET $7`
 
-	rows, err := database.RMS.Query(SQL, arguments...)
+	users := make([]models.User, 0)
+	err := database.RMS.Select(&users, SQL, arguments...)
+
 	if err != nil {
 		return nil, err
 	}
-	return utils.ImproveUsers(rows)
+	userIDs := utils.GetValuesFromUser(users, "ID")
+
+	addresses, addressErr := GetAddressesByUserIDs(userIDs)
+	if addressErr != nil {
+		return nil, err
+	}
+
+	return utils.UpdateUserAddress(users, addresses)
+
 }

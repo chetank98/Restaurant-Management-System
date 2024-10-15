@@ -43,3 +43,22 @@ func UserContext(r *http.Request) *models.User {
 	}
 	return nil
 }
+
+func ShouldHaveRole(role models.Role) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user := UserContext(r)
+			if user == nil {
+				logrus.Errorf("Failed to get user: %s", user)
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			if user.CurrentRole == role {
+				next.ServeHTTP(w, r)
+				return
+			}
+			logrus.Errorf("Failed to invalid UserRole: %s, accepted: %s", user.CurrentRole, role)
+			w.WriteHeader(http.StatusForbidden)
+		})
+	}
+}

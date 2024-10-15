@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"rms/handler"
 	"rms/middlewares"
+	"rms/models"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -36,12 +37,15 @@ func SetupRoutes() *Server {
 				authRouts.Get("/restaurants", handler.GetRestaurants)
 				authRouts.Get("/restaurant/{restaurantId}/dishes", handler.GetRestaurantsDishes)
 				authRouts.Route("/user", func(user chi.Router) {
+					user.Use(middlewares.ShouldHaveRole(models.RoleUser))
 					user.Group(userRoutes)
 				})
 				authRouts.Route("/sub-admin", func(subAdmin chi.Router) {
+					subAdmin.Use(middlewares.ShouldHaveRole(models.RoleSubAdmin))
 					subAdmin.Group(subAdminRoutes)
 				})
 				authRouts.Route("/admin", func(admin chi.Router) {
+					admin.Use(middlewares.ShouldHaveRole(models.RoleAdmin))
 					admin.Group(adminRoutes)
 					admin.Group(subAdminRoutes)
 				})
