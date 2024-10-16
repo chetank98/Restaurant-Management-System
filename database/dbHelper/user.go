@@ -10,6 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// Instead of queryrowx , use get because get can extract both single value as well as struct
 func CreateUser(db sqlx.Ext, name, email, password string) (string, error) {
 	// language=SQL
 	SQL := `INSERT INTO users(name, email, password) VALUES ($1, TRIM(LOWER($2)), $3) RETURNING id`
